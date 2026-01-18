@@ -121,7 +121,7 @@
                                         View Profile
                                     </a>
                                     {% if room.status in ['scheduled', 'active'] %}
-                                    <a href="{{ url_for('interview.join_interview', room_code=room.room_code) }}" 
+                                    <a href="{{ url_for('interview.join_interview', room_code=room.room_code) }}" hx-boost="false"
                                         class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:opacity-90 transition text-sm">
                                         Join Interview
                                     </a>

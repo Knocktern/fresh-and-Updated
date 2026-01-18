@@ -13,6 +13,7 @@ from models import (
     InterviewerProfile, InterviewerSkill, InterviewerIndustry, InterviewerAvailability,
     InterviewerReview, InterviewerJobRole, InterviewFeedback, InterviewParticipant
 )
+from services.email_service import send_interview_scheduled_email
 from services import log_activity, create_notification
 from services.job_matching_service import calculate_job_match_score
 from utils.file_utils import allowed_file
@@ -1354,6 +1355,17 @@ def schedule_interview(application_id):
                         user_id=session['user_id'])
             
             db.session.commit()
+            
+            # Send email notification to candidate
+            try:
+                send_interview_scheduled_email(
+                    application.candidate,
+                    application.job,
+                    company,
+                    interview_room
+                )
+            except Exception as e:
+                print(f"Error sending interview email: {str(e)}")
             
             # Send notifications
             candidate_user = application.candidate.user

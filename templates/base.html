@@ -7,7 +7,7 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,6 +68,9 @@
         /* HTMX Indicator */
         .htmx-indicator { opacity: 0;transition: opacity 200ms ease-in; }
         .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+        
+        /* Alpine.js Cloak */
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col" hx-boost="true">
@@ -346,7 +349,17 @@
     <script>
         document.addEventListener('alpine:init', () => {
             // Global Alpine logic can go here
-        })
+        });
+        
+        // Force full page reload for interview room pages
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            var path = evt.detail.pathInfo.requestPath;
+            // Check if navigating to interview room
+            if (path && (path.includes('/interview/room/') || path.includes('/interview/join/'))) {
+                evt.preventDefault();
+                window.location.href = path;
+            }
+        });
     </script>
 </body>
 </html>

@@ -4,9 +4,10 @@ from datetime import datetime
 from extensions import db
 from models import (
     User, JobPosting, Company, CandidateProfile, JobApplication, 
-    JobRequiredSkill, Skill, ApplicationStatusHistory, InterviewRoom, CandidateSkill
+    JobRequiredSkill, Skill, ApplicationStatusHistory, InterviewRoom, CandidateSkill, MCQExam
 )
 from services import create_notification, log_activity, calculate_job_match_score
+from services.email_service import send_application_confirmation_email
 
 job_bp = Blueprint('job', __name__)
 
@@ -229,6 +230,14 @@ def apply_job(job_id):
             )
             
             db.session.commit()
+            
+            # Send confirmation email
+            try:
+                # Check if job has MCQ exam
+                has_exam = MCQExam.query.filter_by(job_id=job_id, is_active=True).first() is not None
+                send_application_confirmation_email(profile, job, company, has_exam=has_exam)
+            except Exception as e:
+                print(f"Error sending confirmation email: {str(e)}")
             
             flash('Application submitted successfully!', 'success')
             return redirect(url_for('candidate.candidate_applications'))

@@ -3,36 +3,91 @@
 {% block title %}{{ exam.exam_title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto" x-data="examHandler()">
-    <!-- Exam Header (Fixed) -->
-    <div class="fixed top-16 left-0 right-0 bg-white border-b border-gray-200 z-40 px-4 py-3 shadow-sm">
-        <div class="max-w-4xl mx-auto flex items-center justify-between">
-            <div>
-                <h1 class="text-lg font-bold text-gray-900">{{ exam.exam_title }}</h1>
-                <p class="text-sm text-gray-600">{{ job.title }} - {{ company.company_name }}</p>
-            </div>
-            <div class="flex items-center space-x-6">
-                <!-- Timer -->
-                <div class="flex items-center space-x-2 px-4 py-2 rounded-xl" 
-                    :class="timeRemaining < 300 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="font-bold font-mono" x-text="formatTime(timeRemaining)"></span>
+<div class="max-w-4xl mx-auto" x-data="examHandler" x-cloak>
+    <!-- Start Exam Modal -->
+    <div id="examModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden" @click.away="">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
+                <div class="flex items-center justify-center mb-4">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
                 </div>
-                <!-- Progress -->
-                <div class="text-sm text-gray-600">
-                    <span class="font-bold text-gray-900" x-text="answeredCount"></span> / {{ questions|length }} answered
+                <h2 class="text-2xl font-bold text-center">Ready to Start Exam?</h2>
+                <p class="text-center text-indigo-100 mt-2">{{ exam.exam_title }}</p>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                    <div class="flex items-start space-x-3">
+                        <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <div class="text-sm text-yellow-800">
+                            <p class="font-semibold mb-1">Important Instructions:</p>
+                            <ul class="space-y-1 list-disc list-inside">
+                                <li>Once started, the timer will continue even if you refresh the page</li>
+                                <li>The exam will auto-submit when time expires</li>
+                                <li>Do not close this tab or navigate away</li>
+                                <li>Ensure stable internet connection</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <div class="text-3xl font-bold text-indigo-600">{{ exam.duration_minutes }}</div>
+                        <div class="text-sm text-gray-600 mt-1">Minutes</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <div class="text-3xl font-bold text-purple-600">{{ questions|length }}</div>
+                        <div class="text-sm text-gray-600 mt-1">Questions</div>
+                    </div>
+                </div>
+                <div class="pt-4 flex space-x-3">
+                    <a href="{{ url_for('candidate.candidate_dashboard') }}" class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition text-center">
+                        Cancel
+                    </a>
+                    <button @click="startExam" type="button" class="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition">
+                        Start Exam
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Spacer for fixed header -->
-    <div class="h-20"></div>
+    <!-- Exam Content (only shown after exam started) -->
+    <div id="examContent" style="display: none;">
+        <!-- Exam Header (Fixed) -->
+        <div class="fixed top-16 left-0 right-0 bg-white border-b border-gray-200 z-40 px-4 py-3 shadow-sm">
+            <div class="max-w-4xl mx-auto flex items-center justify-between">
+                <div>
+                    <h1 class="text-lg font-bold text-gray-900">{{ exam.exam_title }}</h1>
+                    <p class="text-sm text-gray-600">{{ job.title }} - {{ company.company_name }}</p>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <!-- Timer -->
+                    <div class="flex items-center space-x-2 px-4 py-2 rounded-xl" 
+                        :class="timeRemaining < 300 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-bold font-mono" x-text="formatTime(timeRemaining)"></span>
+                    </div>
+                    <!-- Progress -->
+                    <div class="text-sm text-gray-600">
+                        <span class="font-bold text-gray-900" x-text="answeredCount"></span> / {{ questions|length }} answered
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <!-- Exam Content -->
-    <form method="POST" action="{{ url_for('exam.submit_exam', attempt_id=attempt.id) }}" id="examForm" class="space-y-6 pb-24">
+        <!-- Spacer for fixed header -->
+        <div class="h-20"></div>
+
+        <!-- Exam Content -->
+        <form method="POST" action="{{ url_for('exam.submit_exam', attempt_id=attempt.id) }}" id="examForm" class="space-y-6 pb-24">
         <!-- Question Navigation -->
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-36 z-30">
             <div class="flex items-center justify-between mb-4">
@@ -174,35 +229,129 @@
             </div>
         </div>
     </form>
+    </div><!-- End x-show examStarted -->
 </div>
 
 <script>
-function examHandler() {
-    return {
-        timeRemaining: {{ (exam.duration_minutes * 60)|int }},
-        answers: {},
+// Global variables for exam
+const attemptId = {{ attempt.id }};
+const examDurationSeconds = {{ (exam.duration_minutes * 60)|int }};
+
+// Register Alpine component before Alpine starts
+document.addEventListener('alpine:init', () => {
+    Alpine.data('examHandler', () => ({
+        examStarted: false,
+        timeRemaining: examDurationSeconds,
+        answers: {
+            {% for question in questions %}
+            'q{{ question.id }}': null{% if not loop.last %},{% endif %}
+            {% endfor %}
+        },
         flagged: [],
+        timerInterval: null,
+        autoSubmitted: false,
         
         get answeredCount() {
-            return Object.keys(this.answers).filter(k => this.answers[k]).length;
+            return Object.keys(this.answers).filter(k => this.answers[k] !== null && this.answers[k] !== '').length;
         },
         
         init() {
-            // Start timer
-            setInterval(() => {
-                if (this.timeRemaining > 0) {
-                    this.timeRemaining--;
-                } else {
-                    // Auto-submit when time runs out
-                    document.getElementById('examForm').submit();
+            // Check if exam was already started
+            const examState = localStorage.getItem('exam_' + attemptId);
+            if (examState) {
+                const state = JSON.parse(examState);
+                if (state.started) {
+                    this.examStarted = true;
+                    // Hide modal, show content immediately
+                    document.getElementById('examModal').style.display = 'none';
+                    document.getElementById('examContent').style.display = 'block';
+                    // Calculate and start timer
+                    this.calculateTimeRemaining();
+                    this.startTimer();
                 }
-            }, 1000);
+            }
+            
+            // Load saved answers from localStorage
+            const savedAnswers = localStorage.getItem('exam_answers_' + attemptId);
+            if (savedAnswers) {
+                this.answers = JSON.parse(savedAnswers);
+            }
             
             // Warn before leaving
             window.addEventListener('beforeunload', (e) => {
-                e.preventDefault();
-                e.returnValue = '';
+                if (this.examStarted && !this.autoSubmitted) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
             });
+        },
+        
+        startExam() {
+            this.examStarted = true;
+            this.timeRemaining = examDurationSeconds;
+            
+            // Save state to localStorage
+            const state = {
+                started: true,
+                startTime: new Date().toISOString()
+            };
+            localStorage.setItem('exam_' + attemptId, JSON.stringify(state));
+            
+            // Hide modal and show exam content
+            document.getElementById('examModal').style.display = 'none';
+            document.getElementById('examContent').style.display = 'block';
+            
+            // Start the timer
+            this.startTimer();
+        },
+        
+        calculateTimeRemaining() {
+            // Get start time from localStorage
+            const examState = localStorage.getItem('exam_' + attemptId);
+            if (!examState) {
+                this.timeRemaining = examDurationSeconds;
+                return;
+            }
+            
+            const state = JSON.parse(examState);
+            const startTime = new Date(state.startTime);
+            const now = new Date();
+            const elapsedSeconds = Math.floor((now - startTime) / 1000);
+            const remaining = examDurationSeconds - elapsedSeconds;
+            
+            if (remaining <= 0) {
+                this.timeRemaining = 0;
+                this.autoSubmitExam();
+            } else {
+                this.timeRemaining = remaining;
+            }
+        },
+        
+        startTimer() {
+            // Clear any existing timer
+            if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+            }
+            
+            // Update timer every second
+            this.timerInterval = setInterval(() => {
+                if (this.timeRemaining > 0) {
+                    this.timeRemaining--;
+                } else {
+                    clearInterval(this.timerInterval);
+                    this.autoSubmitExam();
+                }
+            }, 1000);
+        },
+        
+        autoSubmitExam() {
+            if (!this.autoSubmitted) {
+                this.autoSubmitted = true;
+                alert('Time is up! Your exam will be submitted automatically.');
+                localStorage.removeItem('exam_' + attemptId);
+                localStorage.removeItem('exam_answers_' + attemptId);
+                document.getElementById('examForm').submit();
+            }
         },
         
         formatTime(seconds) {
@@ -213,6 +362,8 @@ function examHandler() {
         
         setAnswer(questionId, value) {
             this.answers[questionId] = value;
+            // Save answers to localStorage
+            localStorage.setItem('exam_answers_' + attemptId, JSON.stringify(this.answers));
         },
         
         toggleFlag(questionNum) {
@@ -245,10 +396,14 @@ function examHandler() {
                 const unanswered = totalQuestions - this.answeredCount;
                 if (!confirm(`You have ${unanswered} unanswered questions. Are you sure you want to submit?`)) {
                     event.preventDefault();
+                    return;
                 }
             }
+            // Clear localStorage on submit
+            localStorage.removeItem('exam_' + attemptId);
+            localStorage.removeItem('exam_answers_' + attemptId);
         }
-    }
-}
+    }));
+});
 </script>
 {% endblock %}

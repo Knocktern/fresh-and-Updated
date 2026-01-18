@@ -1,531 +1,1026 @@
-// Interview Room WebRTC Implementation
-class InterviewRoom {
-    constructor(roomId, roomCode, userRole, username) {
-        this.roomId = roomId;
-        this.roomCode = roomCode;
-        this.userRole = userRole;
-        this.username = username;
-        this.localStream = null;
-        this.screenStream = null;
-        this.peers = {}; // sid -> RTCPeerConnection
-        this.remoteStreams = {}; // sid -> MediaStream
-        this.sidToUsername = {}; // sid -> username for UI
-        this.socket = io();
-        this.isMuted = false;
-        this.isVideoOff = false;
-        this.isScreenSharing = false;
-        this.currentMainVideoSid = null; // Track whose video is in main view
-        
-        console.log('Interview room initialized:', { roomId, roomCode, userRole, username });
-        
-        this.initializeSocket();
-        this.initializeUI();
-    }
+/**
+ * Google Meet-like Interview Room - WebRTC Implementation
+ * Supports multiple participants, chat, screen sharing
+ */
 
-    initializeSocket() {
-        // Join the interview room
-        this.socket.emit('join_interview', {
-            room: this.roomId,
-            room_code: this.roomCode,
-            role: this.userRole
-        });
+(function() {
+'use strict';
 
-        // Handle existing participants
-        this.socket.on('participants', (data) => {
-            console.log('Received participants:', data.participants);
-            const list = Array.isArray(data.participants) ? data.participants : [];
-            
-            // Add users to list first
-            list.forEach(p => {
-                this.sidToUsername[p.sid] = p.username;
+// Always allow fresh initialization
+if (window._MeetingRoomLoaded && window.meetingRoom) {
+    console.log('Cleaning up existing meeting room...');
+    try {
+        if (window.meetingRoom.localStream) {
+            window.meetingRoom.localStream.getTracks().forEach(function(t) { t.stop(); });
+        }
+        if (window.meetingRoom.screenStream) {
+            window.meetingRoom.screenStream.getTracks().forEach(function(t) { t.stop(); });
+        }
+        if (window.meetingRoom.socket) {
+            window.meetingRoom.socket.disconnect();
+        }
+        if (window.meetingRoom.peers) {
+            window.meetingRoom.peers.forEach(function(pc) { pc.close(); });
+            window.meetingRoom.peers.clear();
+        }
+        if (window.meetingRoom.remoteStreams) {
+            window.meetingRoom.remoteStreams.forEach(function(stream) {
+                stream.getTracks().forEach(function(t) { t.stop(); });
             });
-            
-            // Then create offers with proper delay
-            list.forEach(p => {
-                setTimeout(() => {
-                    this.createOffer(p.sid);
-                }, 1500);
-            });
-        });
-
-        // Handle user joined
-        this.socket.on('user_joined', (data) => {
-            if (!data || !data.sid) return;
-            if (data.sid === this.socket.id) return; // ignore self
-            
-            console.log('User joined:', data.username, data.sid);
-            this.sidToUsername[data.sid] = data.username;
-            
-            // Create offer for new peer with proper timing
-            setTimeout(() => {
-                this.createOffer(data.sid);
-            }, 2000);
-        });
-
-        // Handle user left
-        this.socket.on('user_left', (data) => {
-            if (!data || !data.sid) return;
-            console.log('User left:', data.username, data.sid);
-            this.removePeer(data.sid);
-            delete this.sidToUsername[data.sid];
-            delete this.remoteStreams[data.sid];
-            
-            // If the main video was showing this user, clear it
-            if (this.currentMainVideoSid === data.sid) {
-                this.clearMainVideo();
-            }
-        });
-
-        // WebRTC signaling
-        this.socket.on('offer', (data) => {
-            if (!data || !data.from) return;
-            console.log('Received offer from:', data.from);
-            this.handleOffer(data.offer, data.from);
-        });
-
-        this.socket.on('answer', (data) => {
-            if (!data || !data.from) return;
-            console.log('Received answer from:', data.from);
-            this.handleAnswer(data.answer, data.from);
-        });
-
-        this.socket.on('ice_candidate', (data) => {
-            if (!data || !data.from) return;
-            console.log('Received ICE candidate from:', data.from);
-            this.handleIceCandidate(data.candidate, data.from);
-        });
-        
-        // Chat messages
-        this.socket.on('chat_message', (data) => {
-            if (typeof addChatMessage === 'function') {
-                addChatMessage(data.username, data.message, false);
-            }
-        });
-    }
-
-    initializeUI() {
-        // Get DOM elements
-        this.localVideo = document.getElementById('localVideo');
-        this.mainVideo = document.getElementById('mainVideo');
-        this.mainVideoLabel = document.getElementById('mainVideoLabel');
-        this.mainVideoContainer = document.getElementById('mainVideoContainer');
-        this.noRemoteMessage = document.getElementById('noRemoteMessage');
-        this.muteBtn = document.getElementById('muteBtn');
-        this.videoToggleBtn = document.getElementById('videoToggleBtn');
-        this.screenShareBtn = document.getElementById('screenShareBtn');
-        this.codeEditorBtn = document.getElementById('codeEditorBtn');
-        this.endCallBtn = document.getElementById('endCallBtn');
-
-        // Add event listeners
-        if (this.muteBtn) this.muteBtn.addEventListener('click', () => this.toggleMute());
-        if (this.videoToggleBtn) this.videoToggleBtn.addEventListener('click', () => this.toggleVideo());
-        if (this.screenShareBtn) this.screenShareBtn.addEventListener('click', () => this.toggleScreenShare());
-        if (this.codeEditorBtn) this.codeEditorBtn.addEventListener('click', () => this.openCodeEditor());
-        if (this.endCallBtn) this.endCallBtn.addEventListener('click', () => this.endCall());
-
-        // Initialize local video
-        this.startLocalVideo();
-    }
-
-    async startLocalVideo() {
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
-            
-            if (this.localVideo) {
-                this.localVideo.srcObject = this.localStream;
-                this.localVideo.play().catch(e => console.log('Local video autoplay prevented'));
-            }
-            console.log('Local video started');
-        } catch (error) {
-            console.error('Error accessing media devices:', error);
-            // Try audio-only fallback
-            try {
-                this.localStream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: false
-                });
-                console.log('Audio-only mode activated');
-            } catch (audioError) {
-                console.error('Error accessing audio:', audioError);
-                alert('Please allow camera and microphone access to participate in the interview');
-            }
+            window.meetingRoom.remoteStreams.clear();
         }
-    }
-
-    async createPeerConnection(sid) {
-        const configuration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ],
-            iceCandidatePoolSize: 10
-        };
-
-        const peerConnection = new RTCPeerConnection(configuration);
-
-        // Add local stream tracks FIRST
-        if (this.localStream) {
-            this.localStream.getTracks().forEach(track => {
-                console.log('Adding local track:', track.kind, 'to peer:', sid);
-                peerConnection.addTrack(track, this.localStream);
-            });
+        // Clear video grid
+        var existingGrid = document.getElementById('videoGrid');
+        if (existingGrid) {
+            existingGrid.innerHTML = '';
         }
+    } catch(e) { console.log('Cleanup error:', e); }
+    window.meetingRoom = null;
+}
+window._MeetingRoomLoaded = true;
 
-        // Handle connection state changes
-        peerConnection.onconnectionstatechange = () => {
-            console.log(`Connection state with ${sid}:`, peerConnection.connectionState);
-            if (peerConnection.connectionState === 'failed') {
-                console.log('Connection failed, attempting to restart ICE');
-                peerConnection.restartIce();
-            }
-        };
-
-        // Handle ICE connection state
-        peerConnection.oniceconnectionstatechange = () => {
-            console.log(`ICE connection state with ${sid}:`, peerConnection.iceConnectionState);
-        };
-
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log('Sending ICE candidate to:', sid);
-                this.socket.emit('ice_candidate', {
-                    to: sid,
-                    candidate: event.candidate
-                });
-            } else {
-                console.log('All ICE candidates sent for:', sid);
-            }
-        };
-
-        // Handle remote stream
-        peerConnection.ontrack = (event) => {
-            console.log('Received remote track from:', sid, 'kind:', event.track.kind);
-            if (event.streams && event.streams[0]) {
-                this.setRemoteVideo(sid, event.streams[0]);
-            }
-        };
-
-        return peerConnection;
-    }
-
-    async createOffer(sid) {
-        let peerConnection = this.peers[sid];
-        if (!peerConnection) {
-            peerConnection = await this.createPeerConnection(sid);
-            this.peers[sid] = peerConnection;
-        }
-
-        try {
-            const offer = await peerConnection.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true
-            });
-            await peerConnection.setLocalDescription(offer);
-            
-            console.log('Sending offer to:', sid);
-            this.socket.emit('offer', { 
-                to: sid, 
-                offer: offer 
-            });
-        } catch (error) {
-            console.error('Error creating offer for', sid, error);
-        }
-    }
-
-    async handleOffer(offer, fromSid) {
-        let peerConnection = this.peers[fromSid];
-        if (!peerConnection) {
-            peerConnection = await this.createPeerConnection(fromSid);
-            this.peers[fromSid] = peerConnection;
-        }
-
-        try {
-            const remoteDesc = new RTCSessionDescription(offer);
-            
-            if (peerConnection.signalingState === 'have-local-offer') {
-                await peerConnection.setLocalDescription({ type: 'rollback' });
-            }
-            
-            await peerConnection.setRemoteDescription(remoteDesc);
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            
-            console.log('Sending answer to:', fromSid);
-            this.socket.emit('answer', { 
-                to: fromSid, 
-                answer: answer 
-            });
-        } catch (error) {
-            console.error('Error handling offer from', fromSid, error);
-        }
-    }
-
-    async handleAnswer(answer, fromSid) {
-        const peerConnection = this.peers[fromSid];
-        if (peerConnection) {
-            try {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                console.log('Answer processed for:', fromSid);
-            } catch (error) {
-                console.error('Error handling answer from', fromSid, error);
-            }
-        }
-    }
-
-    async handleIceCandidate(candidate, fromSid) {
-        const peerConnection = this.peers[fromSid];
-        if (peerConnection && peerConnection.remoteDescription) {
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log('ICE candidate added for:', fromSid);
-            } catch (error) {
-                console.error('Error adding ICE candidate from', fromSid, error);
-            }
-        }
-    }
-
-    // Set remote video in main view
-    setRemoteVideo(sid, stream) {
-        console.log('Setting remote video for:', sid);
-        
-        // Store the stream
-        this.remoteStreams[sid] = stream;
-        
-        // Show in main video
-        if (this.mainVideo) {
-            this.mainVideo.srcObject = stream;
-            this.mainVideo.style.display = 'block';
-            this.mainVideo.play().catch(e => console.log('Remote video autoplay prevented'));
-        }
-        
-        // Update label
-        const username = this.sidToUsername[sid] || 'Participant';
-        if (this.mainVideoLabel) {
-            this.mainVideoLabel.textContent = username;
-            this.mainVideoLabel.style.display = 'block';
-        }
-        
-        // Hide waiting message
-        if (this.noRemoteMessage) {
-            this.noRemoteMessage.style.display = 'none';
-        }
-        
-        this.currentMainVideoSid = sid;
-        console.log('Remote video set successfully for:', sid);
-    }
+function MeetingRoom(config) {
+    var self = this;
     
-    clearMainVideo() {
-        if (this.mainVideo) {
-            this.mainVideo.srcObject = null;
-            this.mainVideo.style.display = 'none';
-        }
-        if (this.mainVideoLabel) {
-            this.mainVideoLabel.style.display = 'none';
-        }
-        if (this.noRemoteMessage) {
-            this.noRemoteMessage.style.display = 'block';
-        }
-        this.currentMainVideoSid = null;
-    }
+    this.roomId = config.roomId;
+    this.roomCode = config.roomCode;
+    this.userId = config.userId;
+    this.username = config.username;
+    this.userRole = config.userRole;
+    
+    // Media streams
+    this.localStream = null;
+    this.screenStream = null;
+    
+    // Peer connections: peerId -> RTCPeerConnection
+    this.peers = new Map();
+    
+    // Remote streams: peerId -> MediaStream
+    this.remoteStreams = new Map();
+    
+    // Participant info: peerId -> { username, role }
+    this.participants = new Map();
+    
+    // State
+    this.isAudioEnabled = true;
+    this.isVideoEnabled = true;
+    this.isScreenSharing = false;
+    this.isChatOpen = false;
+    this.isParticipantsOpen = false;
+    
+    // Socket connection
+    this.socket = null;
+    
+    // ICE servers configuration
+    this.iceServers = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+    };
+    
+    // Pending ICE candidates
+    this.pendingCandidates = new Map();
+    
+    // Chat
+    this.messages = [];
+    this.unreadCount = 0;
+    
+    // Setup cleanup on page unload
+    var self = this;
+    window.addEventListener('beforeunload', function() {
+        self.cleanup();
+    });
+    
+    // Initialize
+    this.init();
+}
 
-    removePeer(sid) {
-        if (this.peers[sid]) {
-            this.peers[sid].close();
-            delete this.peers[sid];
-            console.log('Peer connection closed for:', sid);
-        }
-    }
-
-    toggleMute() {
+MeetingRoom.prototype.cleanup = function() {
+    console.log('Cleaning up meeting room...');
+    try {
         if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                this.isMuted = !audioTrack.enabled;
-                
-                if (this.muteBtn) {
-                    this.muteBtn.innerHTML = this.isMuted ? 
-                        '<i class="fas fa-microphone-slash"></i>' : 
-                        '<i class="fas fa-microphone"></i>';
-                    this.muteBtn.classList.toggle('muted', this.isMuted);
-                }
-            }
+            this.localStream.getTracks().forEach(function(t) { t.stop(); });
+            this.localStream = null;
         }
-    }
-
-    toggleVideo() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                this.isVideoOff = !videoTrack.enabled;
-                
-                if (this.videoToggleBtn) {
-                    this.videoToggleBtn.innerHTML = this.isVideoOff ? 
-                        '<i class="fas fa-video-slash"></i>' : 
-                        '<i class="fas fa-video"></i>';
-                    this.videoToggleBtn.classList.toggle('off', this.isVideoOff);
-                }
-            }
-        }
-    }
-
-    async toggleScreenShare() {
-        if (!this.isScreenSharing) {
-            try {
-                this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: true
-                });
-
-                // Replace video track in all peer connections
-                const videoTrack = this.screenStream.getVideoTracks()[0];
-                for (const [sid, peerConnection] of Object.entries(this.peers)) {
-                    const sender = peerConnection.getSenders().find(s => 
-                        s.track && s.track.kind === 'video'
-                    );
-                    if (sender) {
-                        await sender.replaceTrack(videoTrack);
-                    }
-                }
-
-                // Update local video
-                if (this.localVideo) {
-                    this.localVideo.srcObject = this.screenStream;
-                }
-
-                this.isScreenSharing = true;
-                if (this.screenShareBtn) {
-                    this.screenShareBtn.classList.add('active');
-                }
-
-                // Handle screen share ending
-                videoTrack.onended = () => {
-                    this.stopScreenShare();
-                };
-            } catch (error) {
-                console.error('Error starting screen share:', error);
-            }
-        } else {
-            this.stopScreenShare();
-        }
-    }
-
-    async stopScreenShare() {
         if (this.screenStream) {
-            this.screenStream.getTracks().forEach(track => track.stop());
+            this.screenStream.getTracks().forEach(function(t) { t.stop(); });
             this.screenStream = null;
         }
-
-        // Replace screen share track with camera track
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            for (const [sid, peerConnection] of Object.entries(this.peers)) {
-                const sender = peerConnection.getSenders().find(s => 
-                    s.track && s.track.kind === 'video'
-                );
-                if (sender && videoTrack) {
-                    await sender.replaceTrack(videoTrack);
-                }
-            }
-
-            // Update local video
-            if (this.localVideo) {
-                this.localVideo.srcObject = this.localStream;
-            }
+        if (this.socket) {
+            this.socket.emit('leave_interview', { room: this.roomId });
+            this.socket.disconnect();
+            this.socket = null;
         }
-
-        this.isScreenSharing = false;
-        if (this.screenShareBtn) {
-            this.screenShareBtn.classList.remove('active');
+        if (this.peers) {
+            this.peers.forEach(function(pc) { pc.close(); });
+            this.peers.clear();
         }
-    }
+        if (this.remoteStreams) {
+            this.remoteStreams.forEach(function(stream) {
+                stream.getTracks().forEach(function(t) { t.stop(); });
+            });
+            this.remoteStreams.clear();
+        }
+        if (this.participants) {
+            this.participants.clear();
+        }
+        // Clear video grid
+        var videoGrid = document.getElementById('videoGrid');
+        if (videoGrid) {
+            videoGrid.innerHTML = '';
+        }
+    } catch(e) { console.log('Cleanup error:', e); }
+};
 
-    openCodeEditor() {
-        // Open code editor in a new tab
-        const codeEditorUrl = `/interview/${this.roomCode}/code-editor`;
-        window.open(codeEditorUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+MeetingRoom.prototype.init = function() {
+    var self = this;
+    console.log('Initializing Meeting Room...');
+    
+    // Clear video grid first to prevent duplicates
+    var videoGrid = document.getElementById('videoGrid');
+    if (videoGrid) {
+        console.log('Clearing video grid on init');
+        videoGrid.innerHTML = '';
     }
     
-    // Send chat message
-    sendChat(message) {
-        this.socket.emit('chat_message', {
-            room: this.roomId,
-            message: message
+    this.getLocalMedia().then(function() {
+        self.connectSocket();
+        self.setupUIListeners();
+        self.updateParticipantCount();
+        console.log('Meeting Room initialized successfully');
+    }).catch(function(error) {
+        console.error('Failed to initialize meeting room:', error);
+        self.showError('Failed to initialize meeting. Please check your camera/microphone permissions.');
+    });
+};
+
+MeetingRoom.prototype.getLocalMedia = function() {
+    var self = this;
+    
+    return navigator.mediaDevices.getUserMedia({
+        video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            facingMode: 'user'
+        },
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        }
+    }).then(function(stream) {
+        self.localStream = stream;
+        
+        var localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            localVideo.srcObject = stream;
+            localVideo.muted = true;
+        }
+        
+        console.log('Local media acquired successfully');
+        self.addVideoTile('local', self.username + ' (You)', stream, true);
+        
+    }).catch(function(error) {
+        console.error('Error getting local media:', error);
+        
+        return navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: true
+        }).then(function(stream) {
+            self.localStream = stream;
+            console.log('Audio-only mode');
+            self.isVideoEnabled = false;
+            self.addVideoTile('local', self.username + ' (You)', null, true);
+        });
+    });
+};
+
+MeetingRoom.prototype.connectSocket = function() {
+    var self = this;
+    
+    this.socket = io({
+        transports: ['websocket', 'polling']
+    });
+    
+    this.socket.on('connect', function() {
+        console.log('Socket connected:', self.socket.id);
+        
+        self.socket.emit('join_interview', {
+            room: self.roomId,
+            room_code: self.roomCode,
+            role: self.userRole
+        });
+    });
+    
+    this.socket.on('disconnect', function() {
+        console.log('Socket disconnected');
+        self.showNotification('Connection lost. Reconnecting...');
+    });
+    
+    this.socket.on('participants', function(data) {
+        console.log('Existing participants:', data.participants);
+        data.participants.forEach(function(p) {
+            if (p.sid !== self.socket.id) {
+                self.participants.set(p.sid, { 
+                    username: p.username, 
+                    role: p.role 
+                });
+                console.log('Waiting for offer from existing participant:', p.sid);
+            }
+        });
+        self.updateParticipantCount();
+        self.updateParticipantsList();
+    });
+    
+    this.socket.on('user_joined', function(data) {
+        console.log('User joined:', data);
+        if (data.sid !== self.socket.id) {
+            self.participants.set(data.sid, { 
+                username: data.username, 
+                role: data.role 
+            });
+            self.showNotification(data.username + ' joined the meeting');
+            self.updateParticipantCount();
+            self.updateParticipantsList();
+            
+            console.log('Creating peer connection for new participant:', data.sid);
+            self.createPeerConnection(data.sid, true);
+        }
+    });
+    
+    this.socket.on('user_left', function(data) {
+        console.log('User left:', data);
+        self.handlePeerDisconnect(data.sid);
+        self.showNotification(data.username + ' left the meeting');
+    });
+    
+    this.socket.on('offer', function(data) {
+        console.log('Received offer from:', data.from);
+        self.handleOffer(data.from, data.offer);
+    });
+    
+    this.socket.on('answer', function(data) {
+        console.log('Received answer from:', data.from);
+        self.handleAnswer(data.from, data.answer);
+    });
+    
+    this.socket.on('ice_candidate', function(data) {
+        self.handleIceCandidate(data.from, data.candidate);
+    });
+    
+    this.socket.on('chat_message', function(data) {
+        self.addChatMessage(data.username, data.message, data.timestamp, false);
+    });
+};
+
+MeetingRoom.prototype.createPeerConnection = function(peerId, createOffer) {
+    var self = this;
+    
+    if (this.peers.has(peerId)) {
+        console.log('Peer connection already exists for:', peerId);
+        return Promise.resolve(this.peers.get(peerId));
+    }
+    
+    console.log('Creating peer connection for:', peerId);
+    
+    var pc = new RTCPeerConnection(this.iceServers);
+    this.peers.set(peerId, pc);
+    this.pendingCandidates.set(peerId, []);
+    
+    if (this.localStream) {
+        this.localStream.getTracks().forEach(function(track) {
+            pc.addTrack(track, self.localStream);
         });
     }
-
-    endCall() {
-        if (!confirm('Are you sure you want to leave this interview?')) return;
+    
+    pc.onicecandidate = function(event) {
+        if (event.candidate) {
+            self.socket.emit('ice_candidate', {
+                to: peerId,
+                candidate: event.candidate
+            });
+        }
+    };
+    
+    pc.onconnectionstatechange = function() {
+        console.log('Connection state with ' + peerId + ':', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+            console.log('Successfully connected to ' + peerId);
+        }
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            self.handlePeerDisconnect(peerId);
+        }
+    };
+    
+    pc.oniceconnectionstatechange = function() {
+        console.log('ICE connection state with ' + peerId + ':', pc.iceConnectionState);
+    };
+    
+    pc.ontrack = function(event) {
+        console.log('=== RECEIVED REMOTE TRACK ===');
+        console.log('From peer:', peerId);
+        console.log('Track kind:', event.track.kind);
         
-        // Clean up all peer connections
-        Object.values(this.peers).forEach(pc => pc.close());
-        this.peers = {};
-
-        // Stop all tracks
-        if (this.localStream) {
-            this.localStream.getTracks().forEach(track => track.stop());
-        }
-        if (this.screenStream) {
-            this.screenStream.getTracks().forEach(track => track.stop());
-        }
-
-        // Leave socket room
-        this.socket.emit('leave_interview', { room: this.roomId });
-
-        // Redirect based on role
-        if (this.userRole === 'interviewer') {
-            window.location.href = '/interviewer/dashboard';
+        var stream = event.streams[0];
+        if (stream) {
+            console.log('Stream ID:', stream.id);
+            self.remoteStreams.set(peerId, stream);
+            
+            var participant = self.participants.get(peerId);
+            var username = participant ? participant.username : 'Participant';
+            self.updateRemoteVideoTile(peerId, username, stream);
         } else {
-            window.location.href = '/candidate/interviews';
+            console.log('No stream in event, creating new stream');
+            var existingStream = self.remoteStreams.get(peerId);
+            if (!existingStream) {
+                existingStream = new MediaStream();
+                self.remoteStreams.set(peerId, existingStream);
+            }
+            existingStream.addTrack(event.track);
+            
+            var participant = self.participants.get(peerId);
+            var username = participant ? participant.username : 'Participant';
+            self.updateRemoteVideoTile(peerId, username, existingStream);
+        }
+    };
+    
+    if (createOffer) {
+        return pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+        }).then(function(offer) {
+            return pc.setLocalDescription(offer);
+        }).then(function() {
+            self.socket.emit('offer', {
+                to: peerId,
+                offer: pc.localDescription
+            });
+            console.log('Sent offer to:', peerId);
+            return pc;
+        }).catch(function(error) {
+            console.error('Error creating offer:', error);
+            return pc;
+        });
+    }
+    
+    return Promise.resolve(pc);
+};
+
+MeetingRoom.prototype.handleOffer = function(peerId, offer) {
+    var self = this;
+    var pc = this.peers.get(peerId);
+    
+    var promise = pc ? Promise.resolve(pc) : this.createPeerConnection(peerId, false);
+    
+    return promise.then(function(pc) {
+        return pc.setRemoteDescription(new RTCSessionDescription(offer));
+    }).then(function() {
+        pc = self.peers.get(peerId);
+        var pending = self.pendingCandidates.get(peerId) || [];
+        return Promise.all(pending.map(function(candidate) {
+            return pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }));
+    }).then(function() {
+        self.pendingCandidates.set(peerId, []);
+        pc = self.peers.get(peerId);
+        return pc.createAnswer();
+    }).then(function(answer) {
+        pc = self.peers.get(peerId);
+        return pc.setLocalDescription(answer);
+    }).then(function() {
+        pc = self.peers.get(peerId);
+        self.socket.emit('answer', {
+            to: peerId,
+            answer: pc.localDescription
+        });
+        console.log('Sent answer to:', peerId);
+    }).catch(function(error) {
+        console.error('Error handling offer:', error);
+    });
+};
+
+MeetingRoom.prototype.handleAnswer = function(peerId, answer) {
+    var self = this;
+    var pc = this.peers.get(peerId);
+    
+    if (!pc) return Promise.resolve();
+    
+    return pc.setRemoteDescription(new RTCSessionDescription(answer)).then(function() {
+        var pending = self.pendingCandidates.get(peerId) || [];
+        return Promise.all(pending.map(function(candidate) {
+            return pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }));
+    }).then(function() {
+        self.pendingCandidates.set(peerId, []);
+        console.log('Answer processed for:', peerId);
+    }).catch(function(error) {
+        console.error('Error handling answer:', error);
+    });
+};
+
+MeetingRoom.prototype.handleIceCandidate = function(peerId, candidate) {
+    var pc = this.peers.get(peerId);
+    
+    if (pc && pc.remoteDescription) {
+        return pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(function(error) {
+            console.error('Error adding ICE candidate:', error);
+        });
+    } else {
+        if (!this.pendingCandidates.has(peerId)) {
+            this.pendingCandidates.set(peerId, []);
+        }
+        this.pendingCandidates.get(peerId).push(candidate);
+        return Promise.resolve();
+    }
+};
+
+MeetingRoom.prototype.handlePeerDisconnect = function(peerId) {
+    var pc = this.peers.get(peerId);
+    if (pc) {
+        pc.close();
+        this.peers.delete(peerId);
+    }
+    
+    this.remoteStreams.delete(peerId);
+    this.participants.delete(peerId);
+    this.removeVideoTile(peerId);
+    this.updateParticipantCount();
+    this.updateParticipantsList();
+};
+
+// ==================== VIDEO GRID MANAGEMENT ====================
+
+MeetingRoom.prototype.addVideoTile = function(peerId, username, stream, isLocal) {
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) {
+        console.log('Video grid not found!');
+        return;
+    }
+    
+    // Strictly check if tile already exists anywhere in the DOM
+    var existingTile = document.getElementById('tile-' + peerId);
+    if (existingTile) {
+        console.log('Tile already exists for:', peerId, '- updating instead');
+        var video = existingTile.querySelector('video');
+        var avatar = existingTile.querySelector('.avatar-placeholder');
+        
+        if (stream && stream.getVideoTracks().length > 0) {
+            if (video) {
+                video.srcObject = stream;
+                video.style.display = 'block';
+                video.play().catch(function(e) { console.log('Video play error:', e); });
+            }
+            if (avatar) avatar.style.display = 'none';
+        }
+        return;
+    }
+    
+    // Create new tile
+    console.log('Creating new tile for:', peerId);
+    var tile = document.createElement('div');
+    tile.id = 'tile-' + peerId;
+    tile.className = 'video-tile';
+    
+    var videoContainer = document.createElement('div');
+    videoContainer.className = 'video-container';
+    
+    var video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = isLocal;
+    
+    if (isLocal) {
+        video.classList.add('mirror');
+    }
+    
+    if (stream) {
+        video.srcObject = stream;
+        video.play().catch(function(e) { console.log('Video play error:', e); });
+    }
+    
+    videoContainer.appendChild(video);
+    
+    var avatar = document.createElement('div');
+    avatar.className = 'avatar-placeholder';
+    avatar.innerHTML = '<span>' + username.charAt(0).toUpperCase() + '</span>';
+    avatar.style.display = (stream && stream.getVideoTracks().length > 0) ? 'none' : 'flex';
+    videoContainer.appendChild(avatar);
+    
+    var nameLabel = document.createElement('div');
+    nameLabel.className = 'name-label';
+    nameLabel.innerHTML = '<span class="name">' + username + '</span>' +
+        '<span class="audio-indicator" id="audio-' + peerId + '">' +
+        '<i class="fas fa-microphone"></i></span>';
+    
+    tile.appendChild(videoContainer);
+    tile.appendChild(nameLabel);
+    videoGrid.appendChild(tile);
+    
+    this.updateGridLayout();
+};
+
+MeetingRoom.prototype.updateRemoteVideoTile = function(peerId, username, stream) {
+    console.log('=== UPDATE REMOTE VIDEO TILE ===');
+    console.log('Peer ID:', peerId);
+    
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
+    
+    var tile = document.getElementById('tile-' + peerId);
+    
+    if (tile) {
+        var video = tile.querySelector('video');
+        var avatar = tile.querySelector('.avatar-placeholder');
+        var container = tile.querySelector('.video-container');
+        
+        if (!video && container) {
+            video = document.createElement('video');
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = false;
+            container.insertBefore(video, container.firstChild);
+        }
+        
+        if (video && stream) {
+            video.srcObject = stream;
+            video.style.display = 'block';
+            video.play().catch(function(e) { console.log('Video play error:', e); });
+        }
+        
+        if (avatar && stream && stream.getVideoTracks().length > 0) {
+            avatar.style.display = 'none';
+        }
+    } else {
+        this.addVideoTile(peerId, username, stream, false);
+    }
+};
+
+MeetingRoom.prototype.removeVideoTile = function(peerId) {
+    var tile = document.getElementById('tile-' + peerId);
+    if (tile) {
+        tile.remove();
+        this.updateGridLayout();
+    }
+};
+
+MeetingRoom.prototype.updateGridLayout = function() {
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
+    
+    var count = videoGrid.children.length;
+    videoGrid.className = 'video-grid';
+    
+    if (count === 1) {
+        videoGrid.classList.add('grid-1');
+    } else if (count === 2) {
+        videoGrid.classList.add('grid-2');
+    } else if (count <= 4) {
+        videoGrid.classList.add('grid-4');
+    } else if (count <= 6) {
+        videoGrid.classList.add('grid-6');
+    } else {
+        videoGrid.classList.add('grid-many');
+    }
+};
+
+// ==================== CONTROLS ====================
+
+MeetingRoom.prototype.toggleAudio = function() {
+    if (this.localStream) {
+        var audioTrack = this.localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            this.isAudioEnabled = audioTrack.enabled;
+            
+            var btn = document.getElementById('btnMic');
+            if (btn) {
+                btn.innerHTML = this.isAudioEnabled 
+                    ? '<i class="fas fa-microphone"></i>' 
+                    : '<i class="fas fa-microphone-slash"></i>';
+                if (this.isAudioEnabled) {
+                    btn.classList.remove('btn-danger');
+                } else {
+                    btn.classList.add('btn-danger');
+                }
+            }
+            
+            var indicator = document.getElementById('audio-local');
+            if (indicator) {
+                indicator.innerHTML = this.isAudioEnabled 
+                    ? '<i class="fas fa-microphone"></i>'
+                    : '<i class="fas fa-microphone-slash" style="color: #ea4335;"></i>';
+            }
         }
     }
+};
 
-    // Debug function
-    debugConnections() {
-        console.log('=== Connection Debug Info ===');
-        console.log('Local stream:', this.localStream);
-        console.log('Number of peers:', Object.keys(this.peers).length);
-        console.log('Remote streams:', Object.keys(this.remoteStreams).length);
-        
-        Object.entries(this.peers).forEach(([sid, pc]) => {
-            console.log(`Peer ${sid}:`);
-            console.log('  Connection State:', pc.connectionState);
-            console.log('  ICE Connection State:', pc.iceConnectionState);
-            console.log('  Signaling State:', pc.signalingState);
+MeetingRoom.prototype.toggleVideo = function() {
+    var self = this;
+    if (this.localStream) {
+        var videoTrack = this.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            this.isVideoEnabled = videoTrack.enabled;
+            
+            var btn = document.getElementById('btnCamera');
+            if (btn) {
+                btn.innerHTML = this.isVideoEnabled 
+                    ? '<i class="fas fa-video"></i>' 
+                    : '<i class="fas fa-video-slash"></i>';
+                if (this.isVideoEnabled) {
+                    btn.classList.remove('btn-danger');
+                } else {
+                    btn.classList.add('btn-danger');
+                }
+            }
+            
+            var tile = document.getElementById('tile-local');
+            if (tile) {
+                var video = tile.querySelector('video');
+                var avatar = tile.querySelector('.avatar-placeholder');
+                
+                if (this.isVideoEnabled) {
+                    if (video) video.style.display = 'block';
+                    if (avatar) avatar.style.display = 'none';
+                } else {
+                    if (video) video.style.display = 'none';
+                    if (!avatar) {
+                        var newAvatar = document.createElement('div');
+                        newAvatar.className = 'avatar-placeholder';
+                        newAvatar.innerHTML = '<span>' + self.username.charAt(0).toUpperCase() + '</span>';
+                        tile.querySelector('.video-container').appendChild(newAvatar);
+                    } else {
+                        avatar.style.display = 'flex';
+                    }
+                }
+            }
+        }
+    }
+};
+
+MeetingRoom.prototype.toggleScreenShare = function() {
+    var self = this;
+    
+    if (!this.isScreenSharing) {
+        navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: 'always' },
+            audio: false
+        }).then(function(stream) {
+            self.screenStream = stream;
+            var screenTrack = stream.getVideoTracks()[0];
+            
+            self.peers.forEach(function(pc) {
+                var sender = pc.getSenders().find(function(s) { 
+                    return s.track && s.track.kind === 'video'; 
+                });
+                if (sender) {
+                    sender.replaceTrack(screenTrack);
+                }
+            });
+            
+            var localTile = document.getElementById('tile-local');
+            if (localTile) {
+                var video = localTile.querySelector('video');
+                if (video) {
+                    video.srcObject = stream;
+                    video.classList.remove('mirror');
+                }
+            }
+            
+            self.isScreenSharing = true;
+            
+            var btn = document.getElementById('btnScreenShare');
+            if (btn) btn.classList.add('active');
+            
+            self.showNotification('Screen sharing started');
+            
+            screenTrack.onended = function() { self.stopScreenShare(); };
+            
+        }).catch(function(error) {
+            console.error('Error starting screen share:', error);
         });
+    } else {
+        this.stopScreenShare();
+    }
+};
+
+MeetingRoom.prototype.stopScreenShare = function() {
+    var self = this;
+    
+    if (this.screenStream) {
+        this.screenStream.getTracks().forEach(function(track) { track.stop(); });
+        this.screenStream = null;
+    }
+    
+    if (this.localStream) {
+        var videoTrack = this.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            this.peers.forEach(function(pc) {
+                var sender = pc.getSenders().find(function(s) { 
+                    return s.track && s.track.kind === 'video'; 
+                });
+                if (sender) {
+                    sender.replaceTrack(videoTrack);
+                }
+            });
+        }
+        
+        var localTile = document.getElementById('tile-local');
+        if (localTile) {
+            var video = localTile.querySelector('video');
+            if (video) {
+                video.srcObject = this.localStream;
+                video.classList.add('mirror');
+            }
+        }
+    }
+    
+    this.isScreenSharing = false;
+    
+    var btn = document.getElementById('btnScreenShare');
+    if (btn) btn.classList.remove('active');
+    
+    this.showNotification('Screen sharing stopped');
+};
+
+// ==================== CHAT ====================
+
+MeetingRoom.prototype.toggleChat = function() {
+    var sidebar = document.getElementById('sidebar');
+    var chatPanel = document.getElementById('chatPanel');
+    var participantsPanel = document.getElementById('participantsPanel');
+    
+    if (this.isChatOpen) {
+        sidebar.classList.remove('open');
+        this.isChatOpen = false;
+    } else {
+        sidebar.classList.add('open');
+        chatPanel.style.display = 'flex';
+        participantsPanel.style.display = 'none';
+        this.isChatOpen = true;
+        this.isParticipantsOpen = false;
+        this.unreadCount = 0;
+        this.updateUnreadBadge();
+        
+        var input = document.getElementById('chatInput');
+        if (input) input.focus();
+    }
+};
+
+MeetingRoom.prototype.toggleParticipants = function() {
+    var sidebar = document.getElementById('sidebar');
+    var chatPanel = document.getElementById('chatPanel');
+    var participantsPanel = document.getElementById('participantsPanel');
+    
+    if (this.isParticipantsOpen) {
+        sidebar.classList.remove('open');
+        this.isParticipantsOpen = false;
+    } else {
+        sidebar.classList.add('open');
+        chatPanel.style.display = 'none';
+        participantsPanel.style.display = 'flex';
+        this.isParticipantsOpen = true;
+        this.isChatOpen = false;
+    }
+};
+
+MeetingRoom.prototype.closeSidebar = function() {
+    var sidebar = document.getElementById('sidebar');
+    sidebar.classList.remove('open');
+    this.isChatOpen = false;
+    this.isParticipantsOpen = false;
+};
+
+MeetingRoom.prototype.sendMessage = function() {
+    var input = document.getElementById('chatInput');
+    if (!input) return;
+    
+    var message = input.value.trim();
+    if (!message) return;
+    
+    this.socket.emit('chat_message', {
+        room: this.roomId,
+        message: message
+    });
+    
+    this.addChatMessage(this.username, message, new Date().toISOString(), true);
+    input.value = '';
+};
+
+MeetingRoom.prototype.addChatMessage = function(username, message, timestamp, isLocal) {
+    var container = document.getElementById('chatMessages');
+    if (!container) return;
+    
+    var time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    var msgDiv = document.createElement('div');
+    msgDiv.className = 'chat-message ' + (isLocal ? 'sent' : 'received');
+    msgDiv.innerHTML = '<div class="message-header">' +
+        '<span class="sender">' + username + '</span>' +
+        '<span class="time">' + time + '</span></div>' +
+        '<div class="message-body">' + this.escapeHtml(message) + '</div>';
+    
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    if (!isLocal && !this.isChatOpen) {
+        this.unreadCount++;
+        this.updateUnreadBadge();
+    }
+    
+    this.messages.push({ username: username, message: message, timestamp: timestamp, isLocal: isLocal });
+};
+
+MeetingRoom.prototype.updateUnreadBadge = function() {
+    var badge = document.getElementById('chatBadge');
+    if (badge) {
+        if (this.unreadCount > 0) {
+            badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+};
+
+MeetingRoom.prototype.escapeHtml = function(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+};
+
+// ==================== PARTICIPANTS ====================
+
+MeetingRoom.prototype.updateParticipantCount = function() {
+    var count = this.participants.size + 1;
+    var countEl = document.getElementById('participantCount');
+    if (countEl) {
+        countEl.textContent = count;
+    }
+};
+
+MeetingRoom.prototype.updateParticipantsList = function() {
+    var self = this;
+    var container = document.getElementById('participantsList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    container.innerHTML += this.createParticipantItem(this.username + ' (You)', this.userRole, true);
+    
+    this.participants.forEach(function(info) {
+        container.innerHTML += self.createParticipantItem(info.username, info.role, false);
+    });
+};
+
+MeetingRoom.prototype.createParticipantItem = function(name, role, isSelf) {
+    var roleLabel = role === 'interviewer' ? 'Interviewer' : 'Candidate';
+    var roleClass = role === 'interviewer' ? 'role-interviewer' : 'role-candidate';
+    
+    return '<div class="participant-item ' + (isSelf ? 'self' : '') + '">' +
+        '<div class="participant-avatar">' + name.charAt(0).toUpperCase() + '</div>' +
+        '<div class="participant-info">' +
+        '<div class="participant-name">' + name + '</div>' +
+        '<div class="participant-role ' + roleClass + '">' + roleLabel + '</div></div>' +
+        '<div class="participant-actions"><i class="fas fa-microphone"></i></div></div>';
+};
+
+// ==================== MEETING CONTROLS ====================
+
+MeetingRoom.prototype.leaveMeeting = function() {
+    var self = this;
+    
+    if (!confirm('Are you sure you want to leave this meeting?')) return;
+    
+    if (this.localStream) {
+        this.localStream.getTracks().forEach(function(track) { track.stop(); });
+    }
+    if (this.screenStream) {
+        this.screenStream.getTracks().forEach(function(track) { track.stop(); });
+    }
+    
+    this.peers.forEach(function(pc) { pc.close(); });
+    this.peers.clear();
+    
+    if (this.socket) {
+        this.socket.emit('leave_interview', { room: this.roomId });
+        this.socket.disconnect();
+    }
+    
+    if (this.userRole === 'interviewer') {
+        window.location.href = '/interview/' + this.roomCode + '/feedback';
+    } else {
+        window.location.href = '/candidate/interviews';
+    }
+};
+
+// ==================== UI HELPERS ====================
+
+MeetingRoom.prototype.setupUIListeners = function() {
+    var self = this;
+    
+    var btnMic = document.getElementById('btnMic');
+    if (btnMic) btnMic.addEventListener('click', function() { self.toggleAudio(); });
+    
+    var btnCamera = document.getElementById('btnCamera');
+    if (btnCamera) btnCamera.addEventListener('click', function() { self.toggleVideo(); });
+    
+    var btnScreenShare = document.getElementById('btnScreenShare');
+    if (btnScreenShare) btnScreenShare.addEventListener('click', function() { self.toggleScreenShare(); });
+    
+    var btnChat = document.getElementById('btnChat');
+    if (btnChat) btnChat.addEventListener('click', function() { self.toggleChat(); });
+    
+    var btnParticipants = document.getElementById('btnParticipants');
+    if (btnParticipants) btnParticipants.addEventListener('click', function() { self.toggleParticipants(); });
+    
+    var btnLeave = document.getElementById('btnLeave');
+    if (btnLeave) btnLeave.addEventListener('click', function() { self.leaveMeeting(); });
+    
+    var btnCloseSidebar = document.getElementById('btnCloseSidebar');
+    if (btnCloseSidebar) btnCloseSidebar.addEventListener('click', function() { self.closeSidebar(); });
+    
+    var chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                self.sendMessage();
+            }
+        });
+    }
+    
+    var btnSendMessage = document.getElementById('btnSendMessage');
+    if (btnSendMessage) btnSendMessage.addEventListener('click', function() { self.sendMessage(); });
+};
+
+MeetingRoom.prototype.showNotification = function(message) {
+    var container = document.getElementById('notifications');
+    if (!container) return;
+    
+    var notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    setTimeout(function() {
+        notification.classList.add('fade-out');
+        setTimeout(function() { notification.remove(); }, 300);
+    }, 3000);
+};
+
+MeetingRoom.prototype.showError = function(message) {
+    alert(message);
+};
+
+// ==================== INITIALIZATION ====================
+
+window.MeetingRoom = MeetingRoom;
+
+window.initializeMeeting = function(config) {
+    // Always clean up and create fresh
+    if (window.meetingRoom) {
+        console.log('Cleaning up existing meeting before reinitializing...');
+        try {
+            if (window.meetingRoom.localStream) {
+                window.meetingRoom.localStream.getTracks().forEach(function(t) { t.stop(); });
+            }
+            if (window.meetingRoom.socket) {
+                window.meetingRoom.socket.disconnect();
+            }
+            if (window.meetingRoom.peers) {
+                window.meetingRoom.peers.forEach(function(pc) { pc.close(); });
+            }
+        } catch(e) { console.log('Cleanup error:', e); }
+    }
+    
+    // Clear video grid
+    var videoGrid = document.getElementById('videoGrid');
+    if (videoGrid) {
+        videoGrid.innerHTML = '';
+    }
+    
+    console.log('Initializing meeting with config:', config);
+    window.meetingRoom = new MeetingRoom(config);
+    return window.meetingRoom;
+};
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.meetingConfig) {
+            window.initializeMeeting(window.meetingConfig);
+        }
+    });
+} else {
+    // DOM already loaded
+    if (window.meetingConfig) {
+        window.initializeMeeting(window.meetingConfig);
     }
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Get room data from template
-    const roomData = window.interviewRoomData;
-    if (roomData) {
-        window.interviewRoom = new InterviewRoom(
-            roomData.roomId,
-            roomData.roomCode,
-            roomData.userRole,
-            roomData.username
-        );
-        
-        // Expose debug function globally
-        window.debugConnections = () => window.interviewRoom.debugConnections();
-        
-        console.log('Interview room initialized successfully');
-    } else {
-        console.error('Room data not found!');
-    }
-});
+})();
