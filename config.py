@@ -13,9 +13,9 @@ class Config:
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 587
     MAIL_USE_TLS = True
-    MAIL_USERNAME = 'aasakib13@gmail.com'
-    MAIL_PASSWORD = 'oqsq cezf pgmv neiy'
-    MAIL_DEFAULT_SENDER = ('HireMe Automated Mail', 'aasakib13@gmail.com')
+    MAIL_USERNAME = 'hiremeautomatedmail@gmail.com'
+    MAIL_PASSWORD = 'esoq ymko jrpx uynz'
+    MAIL_DEFAULT_SENDER = ('HireMe', 'hiremeautomatedmail@gmail.com')
     MAIL_MAX_EMAILS = None
     MAIL_ASCII_ATTACHMENTS = False
 
