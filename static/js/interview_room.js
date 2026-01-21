@@ -128,6 +128,13 @@ MeetingRoom.prototype.cleanup = function() {
         if (this.participants) {
             this.participants.clear();
         }
+        // Clear pending timers
+        if (this.updateTileTimers) {
+            this.updateTileTimers.forEach(function(timer) {
+                clearTimeout(timer);
+            });
+            this.updateTileTimers.clear();
+        }
         // Clear video grid
         var videoGrid = document.getElementById('videoGrid');
         if (videoGrid) {
@@ -329,10 +336,6 @@ MeetingRoom.prototype.createPeerConnection = function(peerId, createOffer) {
         if (stream) {
             console.log('Stream ID:', stream.id);
             self.remoteStreams.set(peerId, stream);
-            
-            var participant = self.participants.get(peerId);
-            var username = participant ? participant.username : 'Participant';
-            self.updateRemoteVideoTile(peerId, username, stream);
         } else {
             console.log('No stream in event, creating new stream');
             var existingStream = self.remoteStreams.get(peerId);
@@ -341,11 +344,30 @@ MeetingRoom.prototype.createPeerConnection = function(peerId, createOffer) {
                 self.remoteStreams.set(peerId, existingStream);
             }
             existingStream.addTrack(event.track);
-            
+            stream = existingStream;
+        }
+        
+        // Debounce video tile updates to avoid interrupting play() calls
+        // when both audio and video tracks arrive in quick succession
+        if (self.updateTileTimers && self.updateTileTimers.has(peerId)) {
+            clearTimeout(self.updateTileTimers.get(peerId));
+        }
+        
+        if (!self.updateTileTimers) {
+            self.updateTileTimers = new Map();
+        }
+        
+        var timer = setTimeout(function() {
             var participant = self.participants.get(peerId);
             var username = participant ? participant.username : 'Participant';
-            self.updateRemoteVideoTile(peerId, username, existingStream);
-        }
+            var finalStream = self.remoteStreams.get(peerId);
+            if (finalStream) {
+                self.updateRemoteVideoTile(peerId, username, finalStream);
+            }
+            self.updateTileTimers.delete(peerId);
+        }, 100); // Small delay to let both tracks arrive
+        
+        self.updateTileTimers.set(peerId, timer);
     };
     
     if (createOffer) {
@@ -499,7 +521,16 @@ MeetingRoom.prototype.addVideoTile = function(peerId, username, stream, isLocal)
     
     if (stream) {
         video.srcObject = stream;
-        video.play().catch(function(e) { console.log('Video play error:', e); });
+        
+        // Wait for loadedmetadata before playing to avoid AbortError
+        if (video.readyState >= 2) {
+            video.play().catch(function(e) { console.log('Video play error:', e); });
+        } else {
+            video.addEventListener('loadedmetadata', function onLoaded() {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.play().catch(function(e) { console.log('Video play error after metadata:', e); });
+            });
+        }
     }
     
     videoContainer.appendChild(video);
@@ -546,9 +577,32 @@ MeetingRoom.prototype.updateRemoteVideoTile = function(peerId, username, stream)
         }
         
         if (video && stream) {
-            video.srcObject = stream;
-            video.style.display = 'block';
-            video.play().catch(function(e) { console.log('Video play error:', e); });
+            // Only update srcObject if it's different to avoid interrupting playback
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+                video.style.display = 'block';
+                
+                // Wait for loadedmetadata before playing to avoid AbortError
+                var playPromise = null;
+                if (video.readyState >= 2) {
+                    // Already has metadata, play immediately
+                    playPromise = video.play();
+                } else {
+                    // Wait for metadata to load
+                    video.addEventListener('loadedmetadata', function onLoaded() {
+                        video.removeEventListener('loadedmetadata', onLoaded);
+                        video.play().catch(function(e) { 
+                            console.log('Video play error after metadata:', e); 
+                        });
+                    });
+                }
+                
+                if (playPromise) {
+                    playPromise.catch(function(e) { 
+                        console.log('Video play error:', e); 
+                    });
+                }
+            }
         }
         
         if (avatar && stream && stream.getVideoTracks().length > 0) {
