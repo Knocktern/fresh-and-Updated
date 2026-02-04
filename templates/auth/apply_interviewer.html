@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}Become an Expert Interviewer{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center py-12">
+    <div class="w-full max-w-2xl">
+        <!-- Apply Interviewer Card -->
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 01-2 2H10a2 2 0 01-2-2V6m8 0H8m0 10v4a2 2 0 002 2h4a2 2 0 002-2v-4M8 16h8"></path>
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Become an Expert Interviewer</h1>
+                <p class="text-gray-600">Join our network of professional interviewers and start earning</p>
+            </div>
+
+            <!-- Benefits Section -->
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-blue-900">Flexible Earnings</h3>
+                    </div>
+                    <p class="text-blue-700 text-sm">Set your own hourly rate and work on your schedule</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-green-900">Quality Candidates</h3>
+                    </div>
+                    <p class="text-green-700 text-sm">Interview pre-screened, qualified candidates</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-200">
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-purple-900">Advanced Tools</h3>
+                    </div>
+                    <p class="text-purple-700 text-sm">Use our cutting-edge interview platform with code editor</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl border border-orange-200">
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-orange-900">Professional Network</h3>
+                    </div>
+                    <p class="text-orange-700 text-sm">Connect with top companies and skilled candidates</p>
+                </div>
+            </div>
+
+            <!-- Application Process -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-8">
+                <h3 class="font-semibold text-gray-900 mb-4">Application Process</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center mr-3 text-sm font-semibold">1</div>
+                        <span class="text-gray-700">Submit your application with experience details and CV</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center mr-3 text-sm font-semibold">2</div>
+                        <span class="text-gray-700">Our team reviews your qualifications and experience</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center mr-3 text-sm font-semibold">3</div>
+                        <span class="text-gray-700">Get approved and start conducting professional interviews</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div class="text-center">
+                <a href="{{ url_for('expert_application.apply_as_expert') }}"
+                   class="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-4 px-8 rounded-xl transition duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mb-4">
+                    Start Your Application
+                </a>
+                <p class="text-sm text-gray-600">Already have an account? 
+                    <a href="{{ url_for('auth.login') }}" class="text-indigo-600 hover:text-indigo-800 font-medium hover:underline">Sign in here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -5,7 +5,7 @@ class Config:
     SECRET_KEY = 'your-secret-key-change-this'
     
     # SQLAlchemy Database configuration
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:sakibonlockdown@localhost:3306/job_matching_system'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///job_matching_system.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     

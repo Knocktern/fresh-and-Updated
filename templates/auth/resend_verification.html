@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Resend Email Verification{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center py-12">
+    <div class="w-full max-w-md">
+        <!-- Resend Verification Card -->
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Resend Verification</h1>
+                <p class="text-gray-600">Enter your email to receive a new verification link</p>
+            </div>
+
+            <!-- Form -->
+            <form method="POST" class="space-y-6">
+                <!-- Email -->
+                <div>
+                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                    <div class="relative">
+                        <input type="email" id="email" name="email" required
+                               class="form-input w-full pl-11"
+                               placeholder="you@example.com">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit"
+                        class="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                    Send Verification Email
+                </button>
+            </form>
+
+            <!-- Back to Login -->
+            <div class="text-center mt-6">
+                <a href="{{ url_for('auth.login') }}" 
+                   class="text-sm text-gray-600 hover:text-gray-800 hover:underline">
+                    ← Back to login
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

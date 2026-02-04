@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Enter Verification Code{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center py-12">
+    <div class="w-full max-w-md">
+        <!-- OTP Verification Card -->
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-600 to-blue-600 rounded-2xl mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Check your email</h1>
+                <p class="text-gray-600">We sent a verification code to</p>
+                <p class="font-semibold text-indigo-600">{{ email }}</p>
+            </div>
+
+            <!-- OTP Form -->
+            <div x-data="{ otp: '', countdown: 900 }" x-init="setInterval(() => countdown > 0 && countdown--, 1000)">
+                <form method="POST" class="space-y-6">
+                    <!-- OTP Input -->
+                    <div>
+                        <label for="otp_code" class="block text-sm font-semibold text-gray-700 mb-2">Verification Code</label>
+                        <input type="text" id="otp_code" name="otp_code" required
+                               maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code"
+                               x-model="otp" @input="otp = otp.replace(/[^0-9]/g, '')"
+                               class="form-input w-full text-center text-2xl font-mono tracking-widest"
+                               placeholder="000000">
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            Code expires in <span x-text="Math.floor(countdown/60) + ':' + (countdown%60).toString().padStart(2, '0')"></span>
+                        </p>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit"
+                            :disabled="otp.length !== 6"
+                            :class="otp.length === 6 ? 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700' : 'bg-gray-300 cursor-not-allowed'"
+                            class="w-full text-white font-semibold py-3 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                        Verify Code
+                    </button>
+                </form>
+
+                <!-- Resend Section -->
+                <div class="text-center mt-6">
+                    <p class="text-sm text-gray-600 mb-3">Didn't receive the code?</p>
+                    <button type="button" @click="resendOTP('{{ email }}')"
+                            class="text-indigo-600 hover:text-indigo-800 font-semibold text-sm hover:underline">
+                        Resend verification code
+                    </button>
+                </div>
+
+                <!-- Back to Login -->
+                <div class="text-center mt-6">
+                    <a href="{{ url_for('auth.login') }}" 
+                       class="text-sm text-gray-600 hover:text-gray-800 hover:underline">
+                        ← Back to login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function resendOTP(email) {
+    fetch('/api/resend-otp', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('New verification code sent to your email!');
+        } else {
+            alert('Failed to resend code: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error sending code. Please try again.');
+    });
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+{% endblock %}
