@@ -3,9 +3,9 @@
 {% block title %}{{ exam.exam_title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto" x-data="examHandler" x-cloak>
+<div class="max-w-4xl mx-auto" x-data="examHandler">
     <!-- Start Exam Modal -->
-    <div id="examModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div id="examModal" x-show="!examStarted" style="display: flex;" class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center">
         <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden" @click.away="">
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
                 <div class="flex items-center justify-center mb-4">
@@ -58,7 +58,7 @@
     </div>
 
     <!-- Exam Content (only shown after exam started) -->
-    <div id="examContent" style="display: none;">
+    <div id="examContent" x-show="examStarted">
         <!-- Exam Header (Fixed) -->
         <div class="fixed top-16 left-0 right-0 bg-white border-b border-gray-200 z-40 px-4 py-3 shadow-sm">
             <div class="max-w-4xl mx-auto flex items-center justify-between">
@@ -262,9 +262,6 @@ document.addEventListener('alpine:init', () => {
                 const state = JSON.parse(examState);
                 if (state.started) {
                     this.examStarted = true;
-                    // Hide modal, show content immediately
-                    document.getElementById('examModal').style.display = 'none';
-                    document.getElementById('examContent').style.display = 'block';
                     // Calculate and start timer
                     this.calculateTimeRemaining();
                     this.startTimer();
@@ -287,6 +284,7 @@ document.addEventListener('alpine:init', () => {
         },
         
         startExam() {
+            // Set state immediately
             this.examStarted = true;
             this.timeRemaining = examDurationSeconds;
             
@@ -296,10 +294,6 @@ document.addEventListener('alpine:init', () => {
                 startTime: new Date().toISOString()
             };
             localStorage.setItem('exam_' + attemptId, JSON.stringify(state));
-            
-            // Hide modal and show exam content
-            document.getElementById('examModal').style.display = 'none';
-            document.getElementById('examContent').style.display = 'block';
             
             // Start the timer
             this.startTimer();

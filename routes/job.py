@@ -83,7 +83,7 @@ def browse_jobs():
         ).subquery()
         query = query.filter(JobPosting.id.in_(job_ids_with_skill))
     
-    # Sorting - Using CASE for MySQL compatibility (MySQL doesn't support NULLS LAST)
+    # Sorting - Using COALESCE for NULL handling (compatible with SQLite)
     if sort == 'salary_high':
         query = query.order_by(
             func.coalesce(JobPosting.salary_max, 0).desc(),

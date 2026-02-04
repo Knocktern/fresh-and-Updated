@@ -84,13 +84,15 @@
                     {% for room, application, job, company in upcoming_interviews %}
                     <div class="p-6">
                         <div class="flex items-start space-x-4">
+                            {% if application.candidate %}
+                            <img src="{{ url_for('common.get_candidate_profile_picture', candidate_id=application.candidate.id) }}" 
+                                 alt="Candidate" 
+                                 class="w-14 h-14 rounded-xl object-cover border-2 border-indigo-200 flex-shrink-0">
+                            {% else %}
                             <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                                {% if application.candidate and application.candidate.user %}
-                                {{ application.candidate.user.first_name[0] }}
-                                {% else %}
                                 C
-                                {% endif %}
                             </div>
+                            {% endif %}
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-start justify-between">
                                     <div>

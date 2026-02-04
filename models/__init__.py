@@ -12,6 +12,7 @@ from .interviewer import (
     InterviewerAvailability, InterviewerEarning, InterviewerReview, InterviewerApplication,
     InterviewerJobRole
 )
+from .auth_tokens import EmailVerification, LoginOTP, PasswordReset
 
 __all__ = [
     'User',
@@ -43,4 +44,7 @@ __all__ = [
     'InterviewerReview',
     'InterviewerApplication',
     'InterviewerJobRole',
+    'EmailVerification',
+    'LoginOTP',
+    'PasswordReset',
 ]

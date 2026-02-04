@@ -1,5 +1,6 @@
 from extensions import db
 from datetime import datetime
+from sqlalchemy import CheckConstraint
 
 class Skill(db.Model):
     __tablename__ = 'skills'
@@ -14,5 +15,9 @@ class CandidateSkill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     candidate_id = db.Column(db.Integer, db.ForeignKey('candidate_profiles.id'), nullable=False)
     skill_id = db.Column(db.Integer, db.ForeignKey('skills.id'), nullable=False)
-    proficiency_level = db.Column(db.Enum('Beginner', 'Intermediate', 'Advanced', 'Expert'), default='Intermediate')
+    proficiency_level = db.Column(db.String(20), default='Intermediate')
     years_experience = db.Column(db.Integer, default=0)
+    
+    __table_args__ = (
+        CheckConstraint("proficiency_level IN ('Beginner', 'Intermediate', 'Advanced', 'Expert')", name='proficiency_level_check'),
+    )

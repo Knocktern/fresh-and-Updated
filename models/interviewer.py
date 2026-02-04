@@ -1,5 +1,6 @@
 from extensions import db
 from datetime import datetime
+from sqlalchemy import CheckConstraint
 
 
 class InterviewerProfile(db.Model):
@@ -28,7 +29,7 @@ class InterviewerProfile(db.Model):
     experience_proof_mimetype = db.Column(db.String(100))
     
     # Interviewer Type
-    interviewer_type = db.Column(db.Enum('independent', 'in_house'), default='independent')
+    interviewer_type = db.Column(db.String(20), default='independent')
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True)  # For in-house interviewers
     
     # Payment
@@ -36,7 +37,7 @@ class InterviewerProfile(db.Model):
     currency = db.Column(db.String(10), default='USD')
     
     # Status & Verification
-    approval_status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending')
+    approval_status = db.Column(db.String(20), default='pending')
     rejection_reason = db.Column(db.Text)
     is_verified = db.Column(db.Boolean, default=False)  # Verification badge
     is_active = db.Column(db.Boolean, default=True)
@@ -51,6 +52,11 @@ class InterviewerProfile(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     approved_at = db.Column(db.DateTime)
+    
+    __table_args__ = (
+        CheckConstraint("interviewer_type IN ('independent', 'in_house')", name='interviewer_type_check'),
+        CheckConstraint("approval_status IN ('pending', 'approved', 'rejected')", name='approval_status_check'),
+    )
     
     # Relationships
     user = db.relationship('User', backref=db.backref('interviewer_profile', uselist=False))
@@ -85,7 +91,7 @@ class InterviewerSkill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     interviewer_id = db.Column(db.Integer, db.ForeignKey('interviewer_profiles.id'), nullable=False)
     skill_id = db.Column(db.Integer, db.ForeignKey('skills.id'), nullable=False)
-    proficiency_level = db.Column(db.Enum('Intermediate', 'Advanced', 'Expert'), default='Advanced')
+    proficiency_level = db.Column(db.String(20), default='Advanced')
     years_experience = db.Column(db.Integer, default=0)
     can_interview = db.Column(db.Boolean, default=True)  # Can interview for this skill
     
@@ -94,6 +100,7 @@ class InterviewerSkill(db.Model):
     
     __table_args__ = (
         db.UniqueConstraint('interviewer_id', 'skill_id', name='unique_interviewer_skill'),
+        CheckConstraint("proficiency_level IN ('Intermediate', 'Advanced', 'Expert')", name='interviewer_proficiency_check'),
     )
 
 
@@ -166,11 +173,15 @@ class InterviewerEarning(db.Model):
     amount_earned = db.Column(db.Numeric(10, 2), nullable=False)
     currency = db.Column(db.String(10), default='USD')
     
-    status = db.Column(db.Enum('pending', 'confirmed', 'paid'), default='pending')
+    status = db.Column(db.String(20), default='pending')
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     confirmed_at = db.Column(db.DateTime)
     paid_at = db.Column(db.DateTime)
+    
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'confirmed', 'paid')", name='earning_status_check'),
+    )
     
     # Relationships
     interview_room = db.relationship('InterviewRoom', backref='interviewer_earnings')
@@ -243,7 +254,7 @@ class InterviewerApplication(db.Model):
     certifications_json = db.Column(db.Text)  # JSON array of certification info
     
     # Application status
-    status = db.Column(db.Enum('pending', 'under_review', 'approved', 'rejected'), default='pending')
+    status = db.Column(db.String(20), default='pending')
     rejection_reason = db.Column(db.Text)
     reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     
@@ -253,6 +264,10 @@ class InterviewerApplication(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     reviewed_at = db.Column(db.DateTime)
+    
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'under_review', 'approved', 'rejected')", name='application_status_check'),
+    )
     
     # Relationships
     reviewer = db.relationship('User', foreign_keys=[reviewed_by], backref='reviewed_applications')
@@ -267,11 +282,12 @@ class InterviewerJobRole(db.Model):
     interviewer_id = db.Column(db.Integer, db.ForeignKey('interviewer_profiles.id'), nullable=False)
     
     role_name = db.Column(db.String(255), nullable=False)  # e.g., "React Developer", "Backend Engineer"
-    experience_level = db.Column(db.Enum('Junior', 'Mid', 'Senior', 'Lead', 'Principal', 'All Levels'), default='All Levels')
+    experience_level = db.Column(db.String(20), default='All Levels')
     interviews_conducted = db.Column(db.Integer, default=0)
-    
-    interviewer = db.relationship('InterviewerProfile', backref='job_roles')
     
     __table_args__ = (
         db.UniqueConstraint('interviewer_id', 'role_name', name='unique_interviewer_role'),
+        CheckConstraint("experience_level IN ('Junior', 'Mid', 'Senior', 'Lead', 'Principal', 'All Levels')", name='experience_level_check'),
     )
+    
+    interviewer = db.relationship('InterviewerProfile', backref='job_roles')

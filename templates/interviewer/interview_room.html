@@ -103,7 +103,7 @@
             width: 100%;
             height: 100%;
             max-width: 1400px;
-            max-height: calc(100vh - 180px);
+            max-height: calc(100vh - 160px);
         }
         
         /* Grid layouts based on participant count */
@@ -116,18 +116,33 @@
             grid-template-columns: repeat(2, 1fr);
         }
         
+        .video-grid.grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
         .video-grid.grid-4 {
             grid-template-columns: repeat(2, 1fr);
             grid-template-rows: repeat(2, 1fr);
         }
         
+        .video-grid.grid-5,
         .video-grid.grid-6 {
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: repeat(2, 1fr);
         }
         
         .video-grid.grid-many {
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-auto-rows: minmax(200px, 1fr);
+        }
+        
+        /* When candidate-main exists, use special layout */
+        .video-grid.has-candidate-main {
+            display: grid;
+            grid-template-columns: 2.5fr 1fr;
+            grid-auto-rows: minmax(200px, auto);
+            gap: 12px;
+            align-items: start;
         }
         
         /* Video Tile */
@@ -138,6 +153,58 @@
             overflow: hidden;
             aspect-ratio: 16/9;
             min-height: 200px;
+        }
+        
+        /* Screen Share Tile - Larger display */
+        .video-tile.screen-share {
+            grid-column: 1 / -1;
+            aspect-ratio: 16/9;
+            min-height: 400px;
+        }
+        
+        /* Candidate Main Tile - Prominent display for candidate */
+        .video-tile.candidate-main {
+            grid-column: 1;
+            grid-row: 1 / -1;
+            min-height: 500px;
+            height: 100%;
+        }
+        
+        /* Other participants on the right side */
+        .video-grid.has-candidate-main .video-tile:not(.candidate-main):not(.screen-share) {
+            grid-column: 2;
+            min-height: 200px;
+            max-height: 250px;
+        }
+        
+        /* Candidate badge indicator */
+        .video-tile.candidate-main .name-label::before {
+            content: '👤 CANDIDATE';
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 8px;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Camera tile during screen share - Picture in Picture */
+        .video-tile.camera-pip {
+            position: fixed;
+            bottom: 96px;
+            right: 24px;
+            width: 240px;
+            height: 135px;
+            z-index: 50;
+            border: 2px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Adjust PIP position when sidebar is open */
+        .video-area.sidebar-open .video-tile.camera-pip {
+            right: 384px;
         }
         
         .video-container {
@@ -570,8 +637,39 @@
                 margin-right: 0;
             }
             
+            .video-area.sidebar-open .video-tile.camera-pip {
+                right: 16px;
+            }
+            
             .video-grid.grid-2 {
                 grid-template-columns: 1fr;
+            }
+            
+            .video-grid.grid-3 {
+                grid-template-columns: 1fr;
+            }
+            
+            /* Stack vertically on mobile */
+            .video-grid.has-candidate-main {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            
+            .video-tile.candidate-main {
+                grid-row: 1;
+                min-height: 300px;
+            }
+            
+            .video-grid.has-candidate-main .video-tile:not(.candidate-main) {
+                grid-column: 1;
+                min-height: 180px;
+            }
+            
+            .video-tile.camera-pip {
+                width: 160px;
+                height: 90px;
+                bottom: 88px;
+                right: 16px;
             }
             
             .controls-left, .controls-right {

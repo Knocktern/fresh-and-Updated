@@ -241,6 +241,11 @@ MeetingRoom.prototype.connectSocket = function() {
         });
         self.updateParticipantCount();
         self.updateParticipantsList();
+        
+        // Update candidate-main styling if there are existing participants
+        setTimeout(function() {
+            self.updateAllTilesForCandidateMain();
+        }, 500);
     });
     
     this.socket.on('user_joined', function(data) {
@@ -256,6 +261,11 @@ MeetingRoom.prototype.connectSocket = function() {
             
             console.log('Creating peer connection for new participant:', data.sid);
             self.createPeerConnection(data.sid, true);
+            
+            // Update candidate-main styling for all tiles
+            setTimeout(function() {
+                self.updateAllTilesForCandidateMain();
+            }, 500);
         }
     });
     
@@ -263,6 +273,11 @@ MeetingRoom.prototype.connectSocket = function() {
         console.log('User left:', data);
         self.handlePeerDisconnect(data.sid);
         self.showNotification(data.username + ' left the meeting');
+        
+        // Update candidate-main styling for remaining tiles
+        setTimeout(function() {
+            self.updateAllTilesForCandidateMain();
+        }, 300);
     });
     
     this.socket.on('offer', function(data) {
@@ -281,6 +296,36 @@ MeetingRoom.prototype.connectSocket = function() {
     
     this.socket.on('chat_message', function(data) {
         self.addChatMessage(data.username, data.message, data.timestamp, false);
+    });
+    
+    // Screen sharing events
+    this.socket.on('peer_screen_share_started', function(data) {
+        console.log('Peer started screen sharing:', data.from);
+        var participant = self.participants.get(data.from);
+        if (participant) {
+            participant.isScreenSharing = true;
+            self.showNotification(data.username + ' started sharing screen');
+        }
+    });
+    
+    this.socket.on('peer_screen_share_stopped', function(data) {
+        console.log('Peer stopped screen sharing:', data.from);
+        var participant = self.participants.get(data.from);
+        if (participant) {
+            participant.isScreenSharing = false;
+            // Remove screen share tile
+            var screenTile = document.getElementById('tile-' + data.from + '-screen');
+            if (screenTile) {
+                screenTile.remove();
+                self.updateGridLayout();
+            }
+            // Restore camera tile to normal
+            var cameraTile = document.getElementById('tile-' + data.from);
+            if (cameraTile) {
+                cameraTile.classList.remove('camera-pip');
+            }
+            self.showNotification(data.username + ' stopped sharing screen');
+        }
     });
 };
 
@@ -507,6 +552,9 @@ MeetingRoom.prototype.addVideoTile = function(peerId, username, stream, isLocal)
     tile.id = 'tile-' + peerId;
     tile.className = 'video-tile';
     
+    // Make candidate's tile prominent when there are multiple users
+    this.applyCandidateMainStyle(tile, peerId);
+    
     var videoContainer = document.createElement('div');
     videoContainer.className = 'video-container';
     
@@ -549,7 +597,80 @@ MeetingRoom.prototype.addVideoTile = function(peerId, username, stream, isLocal)
     
     tile.appendChild(videoContainer);
     tile.appendChild(nameLabel);
-    videoGrid.appendChild(tile);
+    
+    // Insert candidate tiles at the beginning, others at the end
+    var videoGrid = document.getElementById('videoGrid');
+    var isCandidate = false;
+    if (peerId === 'local') {
+        isCandidate = this.userRole === 'candidate';
+    } else {
+        var participant = this.participants.get(peerId);
+        isCandidate = participant && participant.role === 'candidate';
+    }
+    
+    if (isCandidate && videoGrid.children.length > 0) {
+        videoGrid.insertBefore(tile, videoGrid.firstChild);
+    } else {
+        videoGrid.appendChild(tile);
+    }
+    
+    this.updateGridLayout();
+};
+
+MeetingRoom.prototype.addScreenShareTile = function(peerId, username, stream) {
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) {
+        console.log('Video grid not found!');
+        return;
+    }
+    
+    // Check if tile already exists
+    var existingTile = document.getElementById('tile-' + peerId);
+    if (existingTile) {
+        console.log('Screen share tile already exists');
+        return;
+    }
+    
+    // Create new screen share tile
+    console.log('Creating screen share tile for:', peerId);
+    var tile = document.createElement('div');
+    tile.id = 'tile-' + peerId;
+    tile.className = 'video-tile screen-share';
+    
+    var videoContainer = document.createElement('div');
+    videoContainer.className = 'video-container';
+    
+    var video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    
+    if (stream) {
+        video.srcObject = stream;
+        
+        if (video.readyState >= 2) {
+            video.play().catch(function(e) { console.log('Screen share play error:', e); });
+        } else {
+            video.addEventListener('loadedmetadata', function onLoaded() {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.play().catch(function(e) { console.log('Screen share play error after metadata:', e); });
+            });
+        }
+    }
+    
+    videoContainer.appendChild(video);
+    
+    var nameLabel = document.createElement('div');
+    nameLabel.className = 'name-label';
+    nameLabel.innerHTML = '<span class="name">' + username + '</span>' +
+        '<span class="audio-indicator">' +
+        '<i class="fas fa-desktop"></i></span>';
+    
+    tile.appendChild(videoContainer);
+    tile.appendChild(nameLabel);
+    
+    // Insert at the beginning of the grid
+    videoGrid.insertBefore(tile, videoGrid.firstChild);
     
     this.updateGridLayout();
 };
@@ -608,6 +729,9 @@ MeetingRoom.prototype.updateRemoteVideoTile = function(peerId, username, stream)
         if (avatar && stream && stream.getVideoTracks().length > 0) {
             avatar.style.display = 'none';
         }
+        
+        // Apply candidate-main styling if needed
+        this.applyCandidateMainStyle(tile, peerId);
     } else {
         this.addVideoTile(peerId, username, stream, false);
     }
@@ -621,6 +745,68 @@ MeetingRoom.prototype.removeVideoTile = function(peerId) {
     }
 };
 
+MeetingRoom.prototype.applyCandidateMainStyle = function(tile, peerId) {
+    if (!tile) return;
+    
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
+    
+    // Count total participants (excluding screen shares)
+    var participantCount = this.participants.size + 1; // +1 for self
+    
+    // Only apply if there are 2+ participants
+    if (participantCount < 2) {
+        tile.classList.remove('candidate-main');
+        return;
+    }
+    
+    // Check if this tile is for a candidate
+    var isCandidate = false;
+    
+    if (peerId === 'local') {
+        // Check if local user is a candidate
+        isCandidate = this.userRole === 'candidate';
+    } else {
+        // Check if remote user is a candidate
+        var participant = this.participants.get(peerId);
+        isCandidate = participant && participant.role === 'candidate';
+    }
+    
+    if (isCandidate) {
+        tile.classList.add('candidate-main');
+        // Move candidate tile to the top
+        if (tile.parentElement === videoGrid && videoGrid.firstChild !== tile) {
+            videoGrid.insertBefore(tile, videoGrid.firstChild);
+        }
+        console.log('Applied candidate-main style to:', peerId);
+    } else {
+        tile.classList.remove('candidate-main');
+    }
+};
+
+MeetingRoom.prototype.updateAllTilesForCandidateMain = function() {
+    var self = this;
+    var videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
+    
+    // Update local tile
+    var localTile = document.getElementById('tile-local');
+    if (localTile && !localTile.classList.contains('camera-pip')) {
+        this.applyCandidateMainStyle(localTile, 'local');
+    }
+    
+    // Update all remote tiles
+    this.participants.forEach(function(info, peerId) {
+        var tile = document.getElementById('tile-' + peerId);
+        if (tile && !tile.classList.contains('camera-pip')) {
+            self.applyCandidateMainStyle(tile, peerId);
+        }
+    });
+    
+    // Update grid layout to reflect changes
+    this.updateGridLayout();
+};
+
 MeetingRoom.prototype.updateGridLayout = function() {
     var videoGrid = document.getElementById('videoGrid');
     if (!videoGrid) return;
@@ -628,11 +814,18 @@ MeetingRoom.prototype.updateGridLayout = function() {
     var count = videoGrid.children.length;
     videoGrid.className = 'video-grid';
     
-    if (count === 1) {
+    // Check if there's a candidate-main tile
+    var hasCandidateMain = videoGrid.querySelector('.candidate-main') !== null;
+    
+    if (hasCandidateMain) {
+        videoGrid.classList.add('has-candidate-main');
+    } else if (count === 1) {
         videoGrid.classList.add('grid-1');
     } else if (count === 2) {
         videoGrid.classList.add('grid-2');
-    } else if (count <= 4) {
+    } else if (count === 3) {
+        videoGrid.classList.add('grid-3');
+    } else if (count === 4) {
         videoGrid.classList.add('grid-4');
     } else if (count <= 6) {
         videoGrid.classList.add('grid-6');
@@ -727,6 +920,7 @@ MeetingRoom.prototype.toggleScreenShare = function() {
             self.screenStream = stream;
             var screenTrack = stream.getVideoTracks()[0];
             
+            // Replace video track in peer connections with screen track
             self.peers.forEach(function(pc) {
                 var sender = pc.getSenders().find(function(s) { 
                     return s.track && s.track.kind === 'video'; 
@@ -736,16 +930,38 @@ MeetingRoom.prototype.toggleScreenShare = function() {
                 }
             });
             
+            // Create a new tile for screen share
+            var screenTile = document.getElementById('tile-local-screen');
+            if (screenTile) {
+                screenTile.remove();
+            }
+            
+            self.addScreenShareTile('local-screen', self.username + "'s Screen", stream);
+            
+            // Convert local camera tile to picture-in-picture
             var localTile = document.getElementById('tile-local');
             if (localTile) {
+                // Remove candidate-main class during screen sharing
+                localTile.classList.remove('candidate-main');
+                localTile.classList.add('camera-pip');
                 var video = localTile.querySelector('video');
                 if (video) {
-                    video.srcObject = stream;
-                    video.classList.remove('mirror');
+                    video.srcObject = self.localStream;
+                    video.classList.add('mirror');
+                }
+                // Move to video area container for proper positioning
+                var videoArea = document.getElementById('videoArea');
+                if (videoArea && localTile.parentElement !== videoArea) {
+                    videoArea.appendChild(localTile);
                 }
             }
             
             self.isScreenSharing = true;
+            
+            // Notify other participants
+            self.socket.emit('screen_share_started', {
+                room: self.roomId
+            });
             
             var btn = document.getElementById('btnScreenShare');
             if (btn) btn.classList.add('active');
@@ -770,6 +986,14 @@ MeetingRoom.prototype.stopScreenShare = function() {
         this.screenStream = null;
     }
     
+    // Remove screen share tile
+    var screenTile = document.getElementById('tile-local-screen');
+    if (screenTile) {
+        screenTile.remove();
+        this.updateGridLayout();
+    }
+    
+    // Restore camera video track to peers
     if (this.localStream) {
         var videoTrack = this.localStream.getVideoTracks()[0];
         if (videoTrack) {
@@ -783,17 +1007,31 @@ MeetingRoom.prototype.stopScreenShare = function() {
             });
         }
         
+        // Restore local camera tile to normal position
         var localTile = document.getElementById('tile-local');
         if (localTile) {
+            localTile.classList.remove('camera-pip');
             var video = localTile.querySelector('video');
             if (video) {
                 video.srcObject = this.localStream;
                 video.classList.add('mirror');
             }
+            // Move back to video grid
+            var videoGrid = document.getElementById('videoGrid');
+            if (videoGrid && localTile.parentElement !== videoGrid) {
+                videoGrid.insertBefore(localTile, videoGrid.firstChild);
+            }
+            // Restore candidate-main styling if applicable
+            this.applyCandidateMainStyle(localTile, 'local');
         }
     }
     
     this.isScreenSharing = false;
+    
+    // Notify other participants
+    this.socket.emit('screen_share_stopped', {
+        room: this.roomId
+    });
     
     var btn = document.getElementById('btnScreenShare');
     if (btn) btn.classList.remove('active');

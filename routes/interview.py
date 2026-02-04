@@ -3,7 +3,8 @@ from extensions import db
 from models import (
     User, ActivityLog, Notification, InterviewRoom, InterviewParticipant, 
     InterviewFeedback, CodeSession, InterviewerRecommendation,
-    JobApplication, JobPosting, Company, CandidateProfile
+    JobApplication, JobPosting, Company, CandidateProfile,
+    InterviewerEarning, InterviewerProfile
 )
 from datetime import datetime
 import json
@@ -176,6 +177,42 @@ Recommendation Reason: {recommendation_reason}
             if room.status != 'completed':
                 room.status = 'completed'
                 room.ended_at = datetime.utcnow()
+                
+                # Calculate interview duration and create earnings for all interviewers
+                if room.started_at:
+                    duration_minutes = int((room.ended_at - room.started_at).total_seconds() / 60)
+                    
+                    # Get all interviewers who participated
+                    interviewer_participants = InterviewParticipant.query.filter_by(
+                        room_id=room.id,
+                        role='interviewer'
+                    ).all()
+                    
+                    for interviewer_participant in interviewer_participants:
+                        # Get interviewer profile
+                        interviewer_profile = InterviewerProfile.query.filter_by(
+                            user_id=interviewer_participant.user_id
+                        ).first()
+                        
+                        if interviewer_profile and interviewer_profile.hourly_rate:
+                            # Calculate earnings based on duration and hourly rate
+                            hourly_rate = float(interviewer_profile.hourly_rate)
+                            amount_earned = (duration_minutes / 60.0) * hourly_rate
+                            
+                            # Create earnings record
+                            earning = InterviewerEarning(
+                                interviewer_id=interviewer_profile.id,
+                                interview_room_id=room.id,
+                                duration_minutes=duration_minutes,
+                                hourly_rate=hourly_rate,
+                                amount_earned=amount_earned,
+                                currency='BDT',
+                                status='pending'
+                            )
+                            db.session.add(earning)
+                            
+                            # Update interviewer's total interviews count
+                            interviewer_profile.total_interviews = (interviewer_profile.total_interviews or 0) + 1
             
             db.session.commit()
             
