@@ -67,6 +67,7 @@ def create_app(config_class=DevelopmentConfig):
     from routes.interview import bp as interview_bp
     from routes.common import bp as common_bp
     from routes.expert_application import bp as expert_application_bp
+    from routes.skills_api import skills_api_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
@@ -80,6 +81,7 @@ def create_app(config_class=DevelopmentConfig):
     app.register_blueprint(interview_bp)
     app.register_blueprint(common_bp)
     app.register_blueprint(expert_application_bp)
+    app.register_blueprint(skills_api_bp)
     
     # Create database tables
     with app.app_context():

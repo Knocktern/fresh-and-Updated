@@ -180,7 +180,7 @@
         </div>
 
         <!-- Skills -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" x-data="{ selectedSkills: {{ candidate_skills|map(attribute=0)|map(attribute='skill_id')|list|tojson }} }">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
                 <h2 class="text-lg font-semibold text-gray-900 flex items-center">
                     <svg class="w-5 h-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,30 +190,64 @@
                 </h2>
             </div>
             <div class="p-6">
-                <p class="text-sm text-gray-500 mb-4">Select your skills and rate your proficiency level</p>
+                <p class="text-sm text-gray-600 mb-4">Select your skills and rate your proficiency level</p>
                 
+                <!-- Search Helper (Optional) -->
+                <div class="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <input type="text" 
+                               id="skill-search-helper" 
+                               placeholder="Search to highlight skills in the list below..."
+                               class="flex-1 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                        <button type="button" 
+                                id="add-custom-skill-btn" 
+                                class="px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition">
+                            Add Custom
+                        </button>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">Type to highlight skills or add a new one if not found</div>
+                </div>
+                
+                <!-- Skills by Category -->
                 {% set skill_categories = available_skills|groupby('category') %}
                 {% for category, skills in skill_categories %}
                 <div class="mb-6">
-                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">{{ category }}</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <button type="button" 
+                            class="w-full flex items-center justify-between text-left text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3 pb-2 border-b border-gray-200 hover:text-indigo-600 transition category-toggle"
+                            data-category="{{ category }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                            </svg>
+                            {{ category or 'Other' }}
+                            <span class="ml-2 text-xs font-normal text-gray-500">({{ skills|length }} skills)</span>
+                        </span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform category-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="category-skills grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 {{ 'hidden' if loop.index > 3 else '' }}">
                         {% for skill in skills %}
                         {% set is_selected = skill.id in (candidate_skills|map(attribute=0)|map(attribute='skill_id')|list) %}
-                        <label class="relative cursor-pointer" x-data="{ selected: {{ 'true' if is_selected else 'false' }} }">
+                        <label class="relative cursor-pointer skill-item" 
+                               data-skill-name="{{ skill.skill_name|lower }}" 
+                               data-skill-id="{{ skill.id }}">
                             <input type="checkbox" name="skills[]" value="{{ skill.id }}" 
                                    {% if is_selected %}checked{% endif %}
-                                   @change="selected = !selected"
-                                   class="sr-only peer">
-                            <div class="p-3 border-2 rounded-xl peer-checked:border-indigo-600 peer-checked:bg-indigo-50 transition hover:border-gray-300">
+                                   class="sr-only peer skill-checkbox">
+                            <div class="p-3 border-2 rounded-xl peer-checked:border-indigo-600 peer-checked:bg-indigo-50 transition hover:border-gray-300 hover:bg-gray-50 {{ 'border-indigo-600 bg-indigo-50' if is_selected else 'border-gray-200' }}">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-medium text-gray-900 text-sm">{{ skill.skill_name }}</span>
-                                    <svg x-show="selected" class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <span class="font-medium text-gray-700 text-sm skill-name">{{ skill.skill_name }}</span>
+                                    <svg class="w-5 h-5 text-indigo-600 skill-check-icon {{ 'hidden' if not is_selected else '' }}" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                     </svg>
                                 </div>
                             </div>
-                            <!-- Proficiency selection (hidden by default, shown when selected) -->
-                            <div x-show="selected" x-transition class="mt-2">
+                            <!-- Proficiency selection (shown when selected) -->
+                            <div class="proficiency-section mt-2 {{ 'hidden' if not is_selected else '' }}">
                                 <select name="proficiency_{{ skill.id }}" class="w-full text-sm border border-gray-200 rounded-lg p-2 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
                                     <option value="Beginner">Beginner</option>
                                     <option value="Intermediate" selected>Intermediate</option>
@@ -243,4 +277,205 @@
         </div>
     </form>
 </div>
+
+<!-- Add Custom Skill Modal -->
+<div id="add-skill-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 max-h-screen overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-900">Add New Skill</h3>
+            <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <form id="add-skill-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Skill Name *</label>
+                <input type="text" 
+                       id="new-skill-name" 
+                       placeholder="e.g. Quantum Computing"
+                       class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                       required>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
+                <select id="new-skill-category" 
+                        class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        required>
+                    <option value="">Select category</option>
+                    {% for category, _ in skill_categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                <textarea id="new-skill-description" 
+                         placeholder="Brief description of the skill..."
+                         rows="3"
+                         class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"></textarea>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" 
+                        id="cancel-add-skill" 
+                        class="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:opacity-90 flex items-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span>Add Skill</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
+    const searchInput = document.getElementById('skill-search-helper');
+    const skillItems = document.querySelectorAll('.skill-item');
+    const skillNames = document.querySelectorAll('.skill-name');
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        skillItems.forEach((item, index) => {
+            const skillName = skillNames[index];
+            const skillText = item.dataset.skillName;
+            
+            if (searchTerm === '' || skillText.includes(searchTerm)) {
+                item.classList.remove('hidden');
+                
+                // Highlight matching text
+                if (searchTerm !== '') {
+                    const regex = new RegExp(`(${escapeRegex(searchTerm)})`, 'gi');
+                    const originalText = skillName.textContent;
+                    skillName.innerHTML = originalText.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
+                    
+                    // Expand parent category if collapsed
+                    const categorySkills = item.closest('.category-skills');
+                    if (categorySkills.classList.contains('hidden')) {
+                        categorySkills.classList.remove('hidden');
+                        const chevron = categorySkills.previousElementSibling.querySelector('.category-chevron');
+                        chevron.style.transform = 'rotate(180deg)';
+                    }
+                } else {
+                    // Remove highlighting
+                    skillName.innerHTML = skillName.textContent;
+                }
+            } else {
+                item.classList.add('hidden');
+                skillName.innerHTML = skillName.textContent; // Remove highlighting
+            }
+        });
+    });
+    
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    // Category toggle functionality
+    document.querySelectorAll('.category-toggle').forEach((toggle, index) => {
+        toggle.addEventListener('click', () => {
+            const skillsContainer = toggle.nextElementSibling;
+            const chevron = toggle.querySelector('.category-chevron');
+            
+            skillsContainer.classList.toggle('hidden');
+            chevron.style.transform = skillsContainer.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        });
+        
+        // Expand first 3 categories by default
+        if (index < 3) {
+            const skillsContainer = toggle.nextElementSibling;
+            const chevron = toggle.querySelector('.category-chevron');
+            skillsContainer.classList.remove('hidden');
+            chevron.style.transform = 'rotate(180deg)';
+        }
+    });
+    
+    // Skill selection functionality
+    document.querySelectorAll('.skill-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const skillItem = this.closest('.skill-item');
+            const checkIcon = skillItem.querySelector('.skill-check-icon');
+            const proficiencySection = skillItem.querySelector('.proficiency-section');
+            const skillDiv = this.nextElementSibling;
+            
+            if (this.checked) {
+                checkIcon.classList.remove('hidden');
+                proficiencySection.classList.remove('hidden');
+                skillDiv.classList.add('border-indigo-600', 'bg-indigo-50');
+                skillDiv.classList.remove('border-gray-200');
+            } else {
+                checkIcon.classList.add('hidden');
+                proficiencySection.classList.add('hidden');
+                skillDiv.classList.remove('border-indigo-600', 'bg-indigo-50');
+                skillDiv.classList.add('border-gray-200');
+            }
+        });
+    });
+    
+    // Add custom skill functionality
+    const addSkillBtn = document.getElementById('add-custom-skill-btn');
+    const modal = document.getElementById('add-skill-modal');
+    const closeModal = document.getElementById('close-modal');
+    const cancelBtn = document.getElementById('cancel-add-skill');
+    const form = document.getElementById('add-skill-form');
+    
+    addSkillBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+    closeModal.addEventListener('click', () => modal.classList.add('hidden'));
+    cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const skillName = document.getElementById('new-skill-name').value.trim();
+        const category = document.getElementById('new-skill-category').value.trim();
+        const description = document.getElementById('new-skill-description').value.trim();
+        
+        if (!skillName || !category) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/skills/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    skill_name: skillName,
+                    category: category,
+                    description: description
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.status === 201 || response.status === 409) {
+                alert(result.message || `Skill "${skillName}" added successfully!`);
+                modal.classList.add('hidden');
+                form.reset();
+                // Reload page to show new skill
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to create skill');
+            }
+        } catch (error) {
+            console.error('Failed to create skill:', error);
+            alert('Failed to create skill. Please try again.');
+        }
+    });
+});
+</script>
 {% endblock %}
