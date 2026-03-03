@@ -34,7 +34,7 @@
         <div class="px-8 py-6">
             <div class="text-center mb-6">
                 <div class="text-5xl font-bold {% if passed %}text-green-600{% else %}text-red-600{% endif %}">
-                    {{ score|int }}%
+                    {{ "%.1f"|format(score or 0) }}%
                 </div>
                 <div class="text-gray-500">Your Score</div>
             </div>
@@ -72,7 +72,7 @@
         <div class="p-6">
             <div class="w-full bg-gray-200 rounded-full h-4 mb-6">
                 <div class="h-4 rounded-full transition-all duration-500 {% if passed %}bg-green-500{% else %}bg-red-500{% endif %}" 
-                    style="width: {{ score }}%"></div>
+                    style="width: {{ score or 0 }}%"></div>
             </div>
 
             {% if breakdown %}

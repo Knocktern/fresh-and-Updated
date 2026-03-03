@@ -109,6 +109,7 @@
                             <a href="{{ url_for('employer.employer_dashboard') }}" class="text-sm font-medium text-white/90 hover:text-white transition">Dashboard</a>
                             <a href="{{ url_for('employer.employer_jobs') }}" class="text-sm font-medium text-white/90 hover:text-white transition">My Jobs</a>
                             <a href="{{ url_for('employer.employer_applications') }}" class="text-sm font-medium text-white/90 hover:text-white transition">Applications</a>
+                            <a href="{{ url_for('employer.employer_interviewers') }}" class="text-sm font-medium text-white/90 hover:text-white transition">Interviewers</a>
                             <a href="{{ url_for('employer.create_job') }}" class="text-sm font-medium text-white/90 hover:text-white transition">Post Job</a>
                         {% elif session.get('user_type') == 'admin' %}
                             <a href="{{ url_for('admin.admin_dashboard') }}" class="text-sm font-medium text-white/90 hover:text-white transition">Dashboard</a>

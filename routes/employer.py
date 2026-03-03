@@ -1434,3 +1434,38 @@ def schedule_interview(application_id):
                          platform_interviewers=platform_interviewers,
                          all_interviewers=all_interviewers,
                          today=datetime.now().strftime('%Y-%m-%d'))
+
+@bp.route('/job/<int:job_id>/toggle-status', methods=['POST'])
+def toggle_job_status(job_id):
+    """Toggle job active/inactive status"""
+    if 'user_id' not in session or session['user_type'] != 'employer':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    user = User.query.get(session['user_id'])
+    company = user.company
+    
+    job = JobPosting.query.get_or_404(job_id)
+    
+    # Check if the job belongs to this employer's company
+    if job.company_id != company.id:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    try:
+        # Toggle the status
+        job.is_active = not job.is_active
+        db.session.commit()
+        
+        # Log the activity
+        status_text = 'activated' if job.is_active else 'deactivated'
+        log_activity('job_postings', 'UPDATE', job.id,
+                    new_values={'is_active': job.is_active})
+        
+        flash(f'Job posting "{job.title}" has been {status_text} successfully!', 'success')
+        return jsonify({
+            'success': True,
+            'is_active': job.is_active,
+            'message': f'Job {status_text} successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500

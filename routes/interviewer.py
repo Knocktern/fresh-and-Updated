@@ -501,11 +501,11 @@ def earnings():
     ).paginate(page=page, per_page=20, error_out=False)
     
     # Calculate totals
-    total_earned = db.session.query(db.func.sum(InterviewerEarning.amount_earned)).filter(
+    total_earnings = db.session.query(db.func.sum(InterviewerEarning.amount_earned)).filter(
         InterviewerEarning.interviewer_id == profile.id
     ).scalar() or 0
     
-    pending_amount = db.session.query(db.func.sum(InterviewerEarning.amount_earned)).filter(
+    pending_earnings = db.session.query(db.func.sum(InterviewerEarning.amount_earned)).filter(
         InterviewerEarning.interviewer_id == profile.id,
         InterviewerEarning.status == 'pending'
     ).scalar() or 0
@@ -515,12 +515,21 @@ def earnings():
         InterviewerEarning.status == 'confirmed'
     ).scalar() or 0
     
+    # Calculate monthly earnings (current month)
+    from datetime import datetime
+    current_month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_earnings = db.session.query(db.func.sum(InterviewerEarning.amount_earned)).filter(
+        InterviewerEarning.interviewer_id == profile.id,
+        InterviewerEarning.created_at >= current_month_start
+    ).scalar() or 0
+    
     return render_template('interviewer/earnings.html',
                          user=user,
                          profile=profile,
                          earnings=earnings_paginated,
-                         total_earned=total_earned,
-                         pending_amount=pending_amount,
+                         total_earnings=total_earnings,
+                         pending_earnings=pending_earnings,
+                         monthly_earnings=monthly_earnings,
                          confirmed_amount=confirmed_amount)
 
 

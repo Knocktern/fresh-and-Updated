@@ -47,9 +47,9 @@
                 </div>
                 <div class="p-6">
                     <div class="flex items-start space-x-4 mb-6">
-                        <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-                            {{ user.first_name[0] }}
-                        </div>
+                        <img src="{{ url_for('common.get_candidate_profile_picture', candidate_id=candidate.id) }}" 
+                             alt="{{ user.first_name }} {{ user.last_name }}" 
+                             class="w-20 h-20 rounded-2xl object-cover border-2 border-gray-200 shadow-md">
                         <div>
                             <h3 class="text-xl font-bold text-gray-900">{{ user.first_name }} {{ user.last_name }}</h3>
                             <p class="text-gray-600">{{ candidate.current_position or 'No position specified' }}</p>

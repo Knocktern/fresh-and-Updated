@@ -63,6 +63,20 @@
                             {{ 'Active' if job.is_active else 'Inactive' }}
                         </span>
                         <div class="flex items-center gap-2">
+                            <!-- Toggle Status Button -->
+                            <button onclick="toggleJobStatus({{ job.id }}, {{ 'true' if job.is_active else 'false' }})" 
+                                    class="p-2 {% if job.is_active %}text-orange-500 hover:text-orange-600{% else %}text-green-500 hover:text-green-600{% endif %} transition rounded-lg hover:bg-gray-100" 
+                                    title="{% if job.is_active %}Deactivate Job{% else %}Activate Job{% endif %}">
+                                {% if job.is_active %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                {% endif %}
+                            </button>
                             <a href="{{ url_for('employer.manage_job_exam', job_id=job.id) }}" class="p-2 text-gray-400 hover:text-indigo-600 transition rounded-lg hover:bg-gray-100" title="Manage Exam">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
@@ -99,4 +113,37 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function toggleJobStatus(jobId, isActive) {
+    const action = isActive ? 'deactivate' : 'activate';
+    const confirmMessage = isActive 
+        ? 'Are you sure you want to deactivate this job posting? It will no longer be visible to candidates.' 
+        : 'Are you sure you want to activate this job posting? It will be visible to candidates again.';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    fetch(`/employer/job/${jobId}/toggle-status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated status
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating job status');
+    });
+}
+</script>
 {% endblock %}

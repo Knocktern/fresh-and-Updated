@@ -35,38 +35,19 @@
                     <div class="p-6 space-y-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Question Type</label>
-                            <div class="grid grid-cols-2 gap-4">
-                                <label class="relative flex items-center p-4 border-2 rounded-xl cursor-pointer transition"
-                                    :class="questionType === 'mcq' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="grid grid-cols-1 gap-4">
+                                <label class="relative flex items-center p-4 border-2 border-indigo-600 bg-indigo-50 rounded-xl cursor-pointer">
                                     <input type="radio" name="question_type" value="mcq" x-model="questionType"
-                                        class="sr-only" {% if not question or question.question_type == 'mcq' %}checked{% endif %}>
+                                        class="sr-only" checked>
                                     <div class="flex items-center">
-                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center mr-3"
-                                            :class="questionType === 'mcq' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'">
+                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-indigo-600 text-white">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                             </svg>
                                         </div>
                                         <div>
-                                            <div class="font-semibold text-gray-900">Multiple Choice</div>
-                                            <div class="text-sm text-gray-500">Single correct answer</div>
-                                        </div>
-                                    </div>
-                                </label>
-                                <label class="relative flex items-center p-4 border-2 rounded-xl cursor-pointer transition"
-                                    :class="questionType === 'coding' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
-                                    <input type="radio" name="question_type" value="coding" x-model="questionType"
-                                        class="sr-only" {% if question and question.question_type == 'coding' %}checked{% endif %}>
-                                    <div class="flex items-center">
-                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center mr-3"
-                                            :class="questionType === 'coding' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div class="font-semibold text-gray-900">Coding</div>
-                                            <div class="text-sm text-gray-500">Write code solution</div>
+                                            <div class="font-semibold text-gray-900">Multiple Choice Question (MCQ)</div>
+                                            <div class="text-sm text-gray-500">Single correct answer from multiple options</div>
                                         </div>
                                     </div>
                                 </label>
@@ -132,34 +113,6 @@
                         <p class="text-sm text-gray-500 mt-4">
                             <span class="text-indigo-600">●</span> Select the radio button next to the correct answer
                         </p>
-                    </div>
-                </div>
-
-                <!-- Coding Question Options -->
-                <div x-show="questionType === 'coding'" x-transition class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                        <h2 class="text-lg font-semibold text-gray-900">Code Settings</h2>
-                    </div>
-                    <div class="p-6 space-y-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Programming Language</label>
-                            <select name="language" class="form-input w-full">
-                                <option value="python" {% if question and question.language == 'python' %}selected{% endif %}>Python</option>
-                                <option value="javascript" {% if question and question.language == 'javascript' %}selected{% endif %}>JavaScript</option>
-                                <option value="java" {% if question and question.language == 'java' %}selected{% endif %}>Java</option>
-                                <option value="cpp" {% if question and question.language == 'cpp' %}selected{% endif %}>C++</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Code Template (Optional)</label>
-                            <textarea name="code_template" rows="6" class="form-input w-full font-mono text-sm" 
-                                placeholder="# Provide a starting template for candidates...">{{ question.code_template if question else '' }}</textarea>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Expected Output</label>
-                            <textarea name="expected_output" rows="4" class="form-input w-full font-mono text-sm"
-                                placeholder="Expected output to validate...">{{ question.expected_output if question else '' }}</textarea>
-                        </div>
                     </div>
                 </div>
 

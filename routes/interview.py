@@ -3,7 +3,8 @@ from extensions import db
 from models import (
     User, ActivityLog, Notification, InterviewRoom, InterviewParticipant, 
     InterviewFeedback, CodeSession, InterviewerRecommendation,
-    JobApplication, JobPosting, Company, CandidateProfile
+    JobApplication, JobPosting, Company, CandidateProfile,
+    InterviewerEarning, InterviewerProfile
 )
 from datetime import datetime
 import json
@@ -176,6 +177,42 @@ Recommendation Reason: {recommendation_reason}
             if room.status != 'completed':
                 room.status = 'completed'
                 room.ended_at = datetime.utcnow()
+                
+                # Calculate interview duration and create earnings for all interviewers
+                if room.started_at:
+                    duration_minutes = int((room.ended_at - room.started_at).total_seconds() / 60)
+                    
+                    # Get all interviewers who participated
+                    interviewer_participants = InterviewParticipant.query.filter_by(
+                        room_id=room.id,
+                        role='interviewer'
+                    ).all()
+                    
+                    for interviewer_participant in interviewer_participants:
+                        # Get interviewer profile
+                        interviewer_profile = InterviewerProfile.query.filter_by(
+                            user_id=interviewer_participant.user_id
+                        ).first()
+                        
+                        if interviewer_profile and interviewer_profile.hourly_rate:
+                            # Calculate earnings based on duration and hourly rate
+                            hourly_rate = float(interviewer_profile.hourly_rate)
+                            amount_earned = (duration_minutes / 60.0) * hourly_rate
+                            
+                            # Create earnings record
+                            earning = InterviewerEarning(
+                                interviewer_id=interviewer_profile.id,
+                                interview_room_id=room.id,
+                                duration_minutes=duration_minutes,
+                                hourly_rate=hourly_rate,
+                                amount_earned=amount_earned,
+                                currency='BDT',
+                                status='pending'
+                            )
+                            db.session.add(earning)
+                            
+                            # Update interviewer's total interviews count
+                            interviewer_profile.total_interviews = (interviewer_profile.total_interviews or 0) + 1
             
             db.session.commit()
             
@@ -241,20 +278,23 @@ def code_editor(room_code):
 
 @bp.route('/api/execute_code', methods=['POST'])
 def api_execute_code():
-    """API endpoint for code execution in interview rooms"""
+    """API endpoint for code execution in interview rooms using Judge0 CE"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
         
     data = request.get_json()
     code = data.get('code', '')
     language = data.get('language', 'javascript')
+    stdin = data.get('stdin', '')  # Support for standard input
     
     if not code:
         return jsonify({'error': 'No code provided'}), 400
         
     try:
         start_time = time.time()
-        output = execute_code(code, language)
+        # Import from utils.code_executor which uses Judge0
+        from utils.code_executor import execute_code
+        output = execute_code(code, language, stdin)
         execution_time = time.time() - start_time
         
         return jsonify({
@@ -676,92 +716,6 @@ def create_notification(user_id, title, message, notification_type='system', act
     db.session.add(notification)
     db.session.commit()
 
-# --- CODE EXECUTION FUNCTIONS ---
-
-import requests
-import subprocess
-
-ONLINE_EXECUTION_ENABLED = True
-PISTON_API_URL = "https://emkc.org/api/v2/piston"
-
-PISTON_LANGUAGE_MAP = {
-    'javascript': {'language': 'javascript', 'version': '*'},
-    'python': {'language': 'python', 'version': '*'},
-    'java': {'language': 'java', 'version': '*'},
-    'cpp': {'language': 'cpp', 'version': '*'},
-    'c': {'language': 'c', 'version': '*'},
-    'csharp': {'language': 'csharp', 'version': '*'},
-    'php': {'language': 'php', 'version': '*'},
-    'ruby': {'language': 'ruby', 'version': '*'},
-    'rust': {'language': 'rust', 'version': '*'},
-    'swift': {'language': 'swift', 'version': '*'},
-}
-
-def execute_code_online(code, language):
-    """Execute code using the Piston API"""
-    try:
-        if not ONLINE_EXECUTION_ENABLED:
-            return "Online code execution is disabled."
-            
-        language_info = PISTON_LANGUAGE_MAP.get(language)
-        if not language_info:
-            return f"Language '{language}' is not supported."
-            
-        # Get available runtimes
-        runtimes_response = requests.get(f"{PISTON_API_URL}/runtimes")
-        if runtimes_response.status_code != 200:
-            return "API Error: Failed to get available runtimes"
-            
-        runtimes = runtimes_response.json()
-        
-        # Find the latest version
-        lang_name = language_info['language']
-        version = None
-        for runtime in runtimes:
-            if runtime['language'] == lang_name:
-                version = runtime['version']
-                break
-                
-        if not version:
-            return f"Language '{language}' is not available."
-            
-        # Execute code
-        payload = {
-            "language": lang_name,
-            "version": version,
-            "files": [{"content": code}],
-            "stdin": "",
-            "args": [],
-            "compile_timeout": 10000,
-            "run_timeout": 3000,
-            "compile_memory_limit": -1,
-            "run_memory_limit": -1
-        }
-        
-        response = requests.post(f"{PISTON_API_URL}/execute", json=payload)
-        if response.status_code != 200:
-            return f"API Error: {response.text}"
-            
-        result = response.json()
-        
-        # Check for compilation errors
-        if 'compile' in result and result['compile']['code'] != 0:
-            return f"Compilation Error: {result['compile']['stderr']}"
-            
-        # Get run results
-        run_result = result.get('run', {})
-        stdout = run_result.get('stdout', '')
-        stderr = run_result.get('stderr', '')
-        exit_code = run_result.get('code', 0)
-        
-        if exit_code == 0:
-            return stdout
-        else:
-            return f"Execution Error (code {exit_code}): {stderr}"
-            
-    except Exception as e:
-        return f"Online execution error: {str(e)}"
-
-def execute_code(code, language):
-    """Execute code via online Piston API only."""
-    return execute_code_online(code, language)
+# --- CODE EXECUTION ---
+# Code execution is now handled by utils/code_executor.py using Judge0 CE API
+# No local execution functions needed - imported on demand in api_execute_code endpoint

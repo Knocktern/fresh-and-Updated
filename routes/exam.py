@@ -77,30 +77,41 @@ def submit_exam(attempt_id):
         # Process answers
         questions = MCQQuestion.query.filter_by(exam_id=attempt.exam_id).all()
         correct_answers = 0
+        total_questions = len(questions)
         
+        # Ensure we have questions to process
+        if not questions:
+            flash('No questions found for this exam', 'error')
+            return redirect(url_for('exam.take_exam', exam_id=attempt.exam_id))
+        
+        # Process each question
         for question in questions:
             selected_answer = request.form.get(f'q{question.id}')
+            is_correct = False
+            
+            # If answer was provided, check if it's correct
             if selected_answer:
                 is_correct = selected_answer == question.correct_answer
                 if is_correct:
                     correct_answers += 1
-                
-                # Save answer
-                answer = CandidateAnswer(
-                    attempt_id=attempt.id,
-                    question_id=question.id,
-                    selected_answer=selected_answer,
-                    is_correct=is_correct
-                )
-                db.session.add(answer)
+            
+            # Save answer (even if not provided - as None/False)
+            answer = CandidateAnswer(
+                attempt_id=attempt.id,
+                question_id=question.id,
+                selected_answer=selected_answer,
+                is_correct=is_correct
+            )
+            db.session.add(answer)
         
-        # Calculate score
-        score = (correct_answers / len(questions)) * 100 if questions else 0
+        # Calculate score - ensure proper float division
+        score = round((float(correct_answers) / float(total_questions)) * 100, 2) if total_questions > 0 else 0.0
         
-        # Update attempt
+        # Update attempt with calculated values
         attempt.completed_at = datetime.utcnow()
         attempt.status = 'completed'
         attempt.correct_answers = correct_answers
+        attempt.total_questions = total_questions  # Ensure this matches actual questions
         attempt.score = score
         attempt.time_spent = (datetime.utcnow() - attempt.started_at).total_seconds()
         
@@ -140,8 +151,9 @@ def exam_result(attempt_id):
     job = JobPosting.query.get(exam.job_id)
     company = job.company if job else None
     
-    # Calculate if passed
-    passed = attempt.score >= exam.passing_score
+    # Calculate if passed - ensure score is not None
+    attempt_score = attempt.score or 0
+    passed = attempt_score >= exam.passing_score
     
     # Get detailed results
     answers = db.session.query(CandidateAnswer, MCQQuestion).join(MCQQuestion).filter(
@@ -154,7 +166,7 @@ def exam_result(attempt_id):
                          job=job,
                          company=company,
                          passed=passed,
-                         score=attempt.score,
-                         correct_count=attempt.correct_answers,
-                         total_questions=attempt.total_questions,
+                         score=attempt_score,
+                         correct_count=attempt.correct_answers or 0,
+                         total_questions=attempt.total_questions or 0,
                          answers=answers)

@@ -185,6 +185,46 @@ def on_chat_message(data):
             'timestamp': datetime.utcnow().isoformat()
         }, room=room_id, include_self=False)
 
+# ===================== Screen Sharing Events =====================
+
+@socketio.on('screen_share_started')
+def on_screen_share_started(data):
+    """Notify others when user starts screen sharing"""
+    room_id = str(data.get('room', ''))
+    
+    if not room_id:
+        room_id = SID_TO_INTERVIEW_ROOM.get(request.sid)
+    
+    if room_id:
+        user_info = INTERVIEW_PARTICIPANTS.get(room_id, {}).get(request.sid, {})
+        username = user_info.get('username', 'Unknown')
+        
+        print(f'{username} started screen sharing in room {room_id}')
+        
+        emit('peer_screen_share_started', {
+            'from': request.sid,
+            'username': username
+        }, room=room_id, include_self=False)
+
+@socketio.on('screen_share_stopped')
+def on_screen_share_stopped(data):
+    """Notify others when user stops screen sharing"""
+    room_id = str(data.get('room', ''))
+    
+    if not room_id:
+        room_id = SID_TO_INTERVIEW_ROOM.get(request.sid)
+    
+    if room_id:
+        user_info = INTERVIEW_PARTICIPANTS.get(room_id, {}).get(request.sid, {})
+        username = user_info.get('username', 'Unknown')
+        
+        print(f'{username} stopped screen sharing in room {room_id}')
+        
+        emit('peer_screen_share_stopped', {
+            'from': request.sid,
+            'username': username
+        }, room=room_id, include_self=False)
+
 # ===================== Code Editor Events (Optional) =====================
 
 @socketio.on('code_change')

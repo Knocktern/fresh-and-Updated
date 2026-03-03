@@ -108,7 +108,7 @@
                 <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
                     <h2 class="text-lg font-semibold text-gray-900">Job Description</h2>
                 </div>
-                <div class="p-6 prose prose-indigo max-w-none">
+                <div class="p-6 prose prose-indigo max-w-none whitespace-pre-line">
                     {{ job.description|safe if job.description else 'No description provided.' }}
                 </div>
             </div>
@@ -119,7 +119,7 @@
                 <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
                     <h2 class="text-lg font-semibold text-gray-900">Requirements</h2>
                 </div>
-                <div class="p-6 prose prose-indigo max-w-none">
+                <div class="p-6 prose prose-indigo max-w-none whitespace-pre-line">
                     {{ job.requirements|safe }}
                 </div>
             </div>

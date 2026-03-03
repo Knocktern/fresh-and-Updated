@@ -431,9 +431,11 @@
 
     <!-- Pagination -->
     {% if jobs.pages > 1 %}
+    {% set query_args = request.args.copy() %}
+    {% set _ = query_args.pop('page', None) %}
     <div class="flex items-center justify-center space-x-2 pt-8">
         {% if jobs.has_prev %}
-        <a href="{{ url_for('job.browse_jobs', page=jobs.prev_num, **request.args) }}" 
+        <a href="{{ url_for('job.browse_jobs', page=jobs.prev_num, **query_args) }}" 
             class="px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition flex items-center">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -448,7 +450,7 @@
                     {% if page_num == jobs.page %}
                     <span class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold">{{ page_num }}</span>
                     {% else %}
-                    <a href="{{ url_for('job.browse_jobs', page=page_num, **request.args) }}"
+                    <a href="{{ url_for('job.browse_jobs', page=page_num, **query_args) }}"
                         class="px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition">
                         {{ page_num }}
                     </a>
@@ -460,7 +462,7 @@
         </div>
 
         {% if jobs.has_next %}
-        <a href="{{ url_for('job.browse_jobs', page=jobs.next_num, **request.args) }}"
+        <a href="{{ url_for('job.browse_jobs', page=jobs.next_num, **query_args) }}"
             class="px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition flex items-center">
             Next
             <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
