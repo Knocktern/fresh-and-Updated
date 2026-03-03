@@ -12,6 +12,69 @@ auth_bp = Blueprint('auth', __name__)
 
 
 # =====================================================
+# SECRET ADMIN REGISTRATION (Hidden route)
+# =====================================================
+@auth_bp.route('/sakib', methods=['GET', 'POST'])
+def secret_admin_register():
+    """Secret admin registration route - not linked anywhere in UI"""
+    if request.method == 'POST':
+        try:
+            # Get form data
+            email = request.form.get('email')
+            password = request.form.get('password')
+            password_confirm = request.form.get('password_confirm')
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            phone = request.form.get('phone')
+            secret_code = request.form.get('secret_code')
+            
+            # Validate secret code (you can change this to any code you want)
+            if secret_code != 'ADMIN2026':
+                flash('Invalid secret code. Access denied.', 'error')
+                return render_template('auth/secret_admin_register.html')
+            
+            # Validate required fields
+            if not all([email, password, password_confirm, first_name, last_name]):
+                flash('All fields except phone are required.', 'error')
+                return render_template('auth/secret_admin_register.html')
+            
+            # Validate password match
+            if password != password_confirm:
+                flash('Passwords do not match.', 'error')
+                return render_template('auth/secret_admin_register.html')
+            
+            # Check if user exists
+            if User.query.filter_by(email=email).first():
+                flash('An account with this email already exists.', 'error')
+                return render_template('auth/secret_admin_register.html')
+            
+            # Create admin user
+            new_admin = User(
+                email=email,
+                password_hash=generate_password_hash(password),
+                user_type='admin',
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                is_active=True,
+                email_verified=True  # Admin accounts are pre-verified
+            )
+            
+            db.session.add(new_admin)
+            db.session.commit()
+            
+            flash('Admin account created successfully! You can now log in.', 'success')
+            return redirect(url_for('auth.login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Registration error: {str(e)}', 'error')
+            return render_template('auth/secret_admin_register.html')
+    
+    return render_template('auth/secret_admin_register.html')
+
+
+# =====================================================
 # INTERVIEWER REGISTRATION
 # =====================================================
 @auth_bp.route('/register/interviewer', methods=['GET', 'POST'])

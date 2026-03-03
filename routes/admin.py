@@ -41,10 +41,15 @@ def admin_dashboard():
         'new_applications_today': JobApplication.query.filter(func.date(JobApplication.applied_at) == func.date(datetime.now())).count()
     }
     
-    # Recent activity
-    recent_activities = ActivityLog.query.order_by(
-        ActivityLog.timestamp.desc()
-    ).limit(20).all()
+    # Recent activity - handle missing or invalid data gracefully
+    try:
+        recent_activities = ActivityLog.query.order_by(
+            ActivityLog.timestamp.desc()
+        ).limit(20).all()
+    except Exception as e:
+        # If activity logs have invalid data or table doesn't exist, return empty list
+        recent_activities = []
+        print(f"Warning: Could not load activity logs: {e}")
     
     # User registration trends (last 30 days)
     thirty_days_ago = datetime.now() - timedelta(days=30)
@@ -193,37 +198,46 @@ def admin_activity_logs():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     
-    query = ActivityLog.query
-    
-    if table_filter:
-        query = query.filter(ActivityLog.table_name == table_filter)
-    
-    if operation_filter:
-        query = query.filter(ActivityLog.operation_type == operation_filter)
-    
-    if date_from:
-        try:
-            from_date = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(ActivityLog.timestamp >= from_date)
-        except ValueError:
-            pass
-    
-    if date_to:
-        try:
-            to_date = datetime.strptime(date_to, '%Y-%m-%d')
-            # Add 1 day to include the entire end date
-            to_date = to_date.replace(hour=23, minute=59, second=59)
-            query = query.filter(ActivityLog.timestamp <= to_date)
-        except ValueError:
-            pass
-    
-    logs = query.order_by(ActivityLog.timestamp.desc()).paginate(
-        page=page, per_page=50, error_out=False
-    )
-    
-    # Get unique table names and operations
-    tables = db.session.query(ActivityLog.table_name).distinct().all()
-    tables = [table[0] for table in tables if table[0]]
+    try:
+        query = ActivityLog.query
+        
+        if table_filter:
+            query = query.filter(ActivityLog.table_name == table_filter)
+        
+        if operation_filter:
+            query = query.filter(ActivityLog.operation_type == operation_filter)
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(ActivityLog.timestamp >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                # Add 1 day to include the entire end date
+                to_date = to_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(ActivityLog.timestamp <= to_date)
+            except ValueError:
+                pass
+        
+        logs = query.order_by(ActivityLog.timestamp.desc()).paginate(
+            page=page, per_page=50, error_out=False
+        )
+        
+        # Get unique table names and operations
+        tables = db.session.query(ActivityLog.table_name).distinct().all()
+        tables = [table[0] for table in tables if table[0]]
+        
+    except Exception as e:
+        # If there's an error loading activity logs (e.g., invalid enum values), show empty results
+        print(f"Error loading activity logs: {e}")
+        from sqlalchemy.orm import Pagination
+        logs = Pagination(query=None, page=1, per_page=50, total=0, items=[])
+        tables = []
+        flash('Activity logs could not be loaded. There may be invalid data in the database.', 'warning')
     
     operations = ['INSERT', 'UPDATE', 'DELETE', 'DOWNLOAD_CV']
     
