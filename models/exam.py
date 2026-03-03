@@ -24,9 +24,9 @@ class MCQQuestion(db.Model):
     option_b = db.Column(db.String(500), nullable=False)
     option_c = db.Column(db.String(500), nullable=False)
     option_d = db.Column(db.String(500), nullable=False)
-    correct_answer = db.Column(db.Enum('A', 'B', 'C', 'D'), nullable=False)
+    correct_answer = db.Column(db.Enum('A', 'B', 'C', 'D', native_enum=False), nullable=False)
     points = db.Column(db.Integer, default=1)
-    difficulty_level = db.Column(db.Enum('Easy', 'Medium', 'Hard'), default='Medium')
+    difficulty_level = db.Column(db.Enum('Easy', 'Medium', 'Hard', native_enum=False), default='Medium')
     category = db.Column(db.String(100))
 
 class ExamAttempt(db.Model):
@@ -39,7 +39,7 @@ class ExamAttempt(db.Model):
     correct_answers = db.Column(db.Integer)
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
-    status = db.Column(db.Enum('in_progress', 'completed', 'abandoned'), default='in_progress')
+    status = db.Column(db.Enum('in_progress', 'completed', 'abandoned', native_enum=False), default='in_progress')
     time_spent = db.Column(db.Integer)  # in seconds
 
 class CandidateAnswer(db.Model):
@@ -47,6 +47,6 @@ class CandidateAnswer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     attempt_id = db.Column(db.Integer, db.ForeignKey('exam_attempts.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('mcq_questions.id'), nullable=False)
-    selected_answer = db.Column(db.Enum('A', 'B', 'C', 'D'))
+    selected_answer = db.Column(db.Enum('A', 'B', 'C', 'D', native_enum=False))
     is_correct = db.Column(db.Boolean)
     time_spent = db.Column(db.Integer)  # time spent on this question in seconds

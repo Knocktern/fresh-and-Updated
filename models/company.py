@@ -7,7 +7,7 @@ class Company(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     company_name = db.Column(db.String(255), nullable=False)
     industry = db.Column(db.String(100))
-    company_size = db.Column(db.Enum('1-10', '11-50', '51-200', '201-500', '500+'))
+    company_size = db.Column(db.Enum('1-10', '11-50', '51-200', '201-500', '500+', native_enum=False))
     location = db.Column(db.String(255))
     description = db.Column(db.Text)
     website = db.Column(db.String(255))
