@@ -119,7 +119,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 **Build fails**:
 - Check if all dependencies are in requirements.txt
-- Verify Python version is 3.11.0
+- Verify Python version is 3.11.11
 
 **Database connection error**:
 - Verify DATABASE_URL is set correctly
