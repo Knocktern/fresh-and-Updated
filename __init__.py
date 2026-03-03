@@ -1,12 +1,13 @@
 from flask import Flask
 from flask_migrate import Migrate
-from config import DevelopmentConfig
+from config import DevelopmentConfig, ProductionConfig
 from extensions import db, mail, socketio
 from models import *
 import realtime  # Import to register Socket.IO event handlers
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import sqlite3
+import os
 
 migrate = Migrate()
 
@@ -18,8 +19,13 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
-def create_app(config_class=DevelopmentConfig):
+def create_app(config_class=None):
     """Application factory function"""
+    # Auto-detect environment if no config provided
+    if config_class is None:
+        env = os.environ.get('FLASK_ENV', 'development')
+        config_class = ProductionConfig if env == 'production' else DevelopmentConfig
+    
     app = Flask(__name__, 
                 template_folder='templates',
                 static_folder='static')
