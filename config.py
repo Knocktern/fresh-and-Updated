@@ -14,6 +14,17 @@ class Config:
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Connection pool settings to prevent SSL errors
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,  # Test connections before using them
+        'pool_recycle': 280,  # Recycle connections before 5 min timeout
+        'pool_size': 5,  # Smaller pool for free tier
+        'max_overflow': 10,  # Max additional connections
+        'connect_args': {
+            'connect_timeout': 10,  # Connection timeout
+        }
+    }
+    
     # Mail configuration
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
     MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
