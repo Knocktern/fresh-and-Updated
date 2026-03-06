@@ -4,6 +4,15 @@ from extensions import mail
 from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
+
+# Try to import SendGrid (fallback if not available)
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail as SGMail
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
 
 
 def send_async_email(app, msg):
@@ -18,9 +27,44 @@ def send_async_email(app, msg):
             traceback.print_exc()
 
 
+def send_email_sendgrid(subject, recipients, text_body, html_body, api_key):
+    """Send email using SendGrid HTTP API (works on Render free tier)"""
+    try:
+        from_email = os.environ.get('MAIL_USERNAME', 'hiremeautomatedmail@gmail.com')
+        
+        message = SGMail(
+            from_email=from_email,
+            to_emails=recipients,
+            subject=subject,
+            plain_text_content=text_body,
+            html_content=html_body
+        )
+        
+        sg = SendGridAPIClient(api_key)
+        response = sg.send(message)
+        
+        print(f"✅ SendGrid email sent! Status: {response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ SendGrid error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def send_email(subject, recipients, text_body, html_body):
     """Send email with both text and HTML versions"""
     try:
+        # Check if SendGrid API key is available (preferred method for Render)
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        
+        if sendgrid_api_key and SENDGRID_AVAILABLE:
+            # Use SendGrid HTTP API (works on Render free tier)
+            print(f"📧 Using SendGrid API to send to {recipients}")
+            return send_email_sendgrid(subject, recipients, text_body, html_body, sendgrid_api_key)
+        
+        # Fallback to Flask-Mail (works locally, blocked on Render free tier)
         # Verify email configuration
         if not current_app.config.get('MAIL_USERNAME'):
             print("❌ MAIL_USERNAME not configured!")
