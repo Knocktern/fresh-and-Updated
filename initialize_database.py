@@ -12,12 +12,8 @@ def initialize_database():
     app = create_app()
     
     with app.app_context():
-        # Drop all existing tables to ensure clean state
-        print("Dropping existing tables...")
-        db.drop_all()
-        
-        # Create all tables
-        print("Creating all tables...")
+        # Only create tables if they don't exist (preserves existing data)
+        print("Creating tables if they don't exist...")
         db.create_all()
         
         print("✅ Database initialized successfully!")

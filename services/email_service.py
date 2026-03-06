@@ -11,13 +11,29 @@ def send_async_email(app, msg):
     with app.app_context():
         try:
             mail.send(msg)
+            print(f"✅ Email sent successfully to {msg.recipients}")
         except Exception as e:
-            print(f"Error sending email: {str(e)}")
+            print(f"❌ Error sending email to {msg.recipients}: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 
 def send_email(subject, recipients, text_body, html_body):
     """Send email with both text and HTML versions"""
     try:
+        # Verify email configuration
+        if not current_app.config.get('MAIL_USERNAME'):
+            print("❌ MAIL_USERNAME not configured!")
+            return False
+        
+        if not current_app.config.get('MAIL_PASSWORD'):
+            print("❌ MAIL_PASSWORD not configured!")
+            return False
+            
+        print(f"📧 Preparing email: '{subject}' to {recipients}")
+        print(f"📧 Using MAIL_SERVER: {current_app.config.get('MAIL_SERVER')}")
+        print(f"📧 Using MAIL_USERNAME: {current_app.config.get('MAIL_USERNAME')}")
+        
         # Create message with proper encoding
         msg = Message(
             subject=subject,
