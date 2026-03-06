@@ -1,6 +1,5 @@
 from flask import Flask
 from flask_migrate import Migrate
-from flask_compress import Compress
 from config import DevelopmentConfig, ProductionConfig
 from extensions import db, mail, socketio
 from models import *
@@ -11,7 +10,6 @@ import sqlite3
 import os
 
 migrate = Migrate()
-compress = Compress()
 
 # Enable foreign key constraints for SQLite
 @event.listens_for(Engine, "connect")
@@ -40,7 +38,6 @@ def create_app(config_class=None):
     mail.init_app(app)
     socketio.init_app(app)
     migrate.init_app(app, db)
-    compress.init_app(app)  # Enable gzip compression for responses
     
     # Register context processor
     @app.context_processor

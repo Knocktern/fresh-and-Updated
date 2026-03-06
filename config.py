@@ -13,12 +13,6 @@ class Config:
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_pre_ping': True,  # Verify connections before using
-        'pool_recycle': 300,  # Recycle connections every 5 minutes
-        'pool_size': 10,  # Connection pool size
-        'max_overflow': 20  # Max overflow connections
-    }
     
     # Mail configuration
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
@@ -42,10 +36,6 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    
-    # Performance optimizations
-    SEND_FILE_MAX_AGE_DEFAULT = 31536000  # Cache static files for 1 year
-    SQLALCHEMY_RECORD_QUERIES = False  # Disable query recording in production
 
 class TestingConfig(Config):
     """Testing configuration"""
