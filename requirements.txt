@@ -3,6 +3,7 @@ Flask-Migrate==4.0.5
 Flask-SQLAlchemy==3.0.5
 Flask-Mail==0.9.1
 Flask-SocketIO==5.3.4
+Flask-Compress==1.14
 python-socketio==5.9.0
 python-engineio==4.7.1
 Werkzeug==2.3.6
