@@ -35,7 +35,7 @@ Visit: https://dashboard.render.com/
 - Branch: `deployment`
 - Name: `hireme-platform`
 - Build Command: `chmod +x build.sh && ./build.sh`
-- Start Command: `gunicorn --worker-class gevent -w 1 --bind 0.0.0.0:$PORT run:app`
+- Start Command: `gunicorn -w 4 --threads 2 --bind 0.0.0.0:$PORT run:app`
 
 #### 4. Add Environment Variables
 
